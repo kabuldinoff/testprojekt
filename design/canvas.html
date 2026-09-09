@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="de" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Notabene — Design Canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Lora:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTABENE — DESIGN CANVAS
+   Eine einzelne, self-contained Datei. Kein Build, kein Framework: im Browser
+   öffnen und ansehen. Sie entstand VOR der ersten React-Komponente und legt
+   Farben, Typografie, Komponenten, Layouts und Zustände fest.
+   Die Farbwerte sind nicht geschätzt, sondern per getComputedStyle aus den
+   Referenzseiten gelesen. Siehe design/README.md.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design-Tokens: DARK — der Default. Muss VOR dem Light-Block stehen:
+   beide Selektoren haben dieselbe Spezifität, bei Gleichstand gewinnt die
+   spätere Regel. Andersherum überstimmt :root jedes [data-mode="light"]
+   und der Toggle tut nichts. ─────────────────────────────────────────── */
+:root, [data-mode="dark"] {
+  --brand-50:  #22304F;   /* muss heller als --surface (#1B2640) sein, sonst
+                             verschwinden Tint-Flächen in der Karte */
+  --brand-100: #2E4272;
+  --brand-600: #5B8DEF;
+  --brand-700: #7FB0FF;
+  --accent:      #FAEF70;
+  --accent-soft: #2A2A18;
+  --accent-ink:  #FAEF70;
+  --ink:        #EDF1F7;
+  --muted-ink:  #A8B0BE;
+  --faint-ink:  #79839A;
+  --surface:    #1B2640;   /* RelationFlow dark gradient, oberer Stop */
+  --surface-2:  #16203A;
+  --canvas:     #0E1424;   /* RelationFlow dark gradient, unterer Stop */
+  --hairline:   #2A3550;
+  --ok:      #4ADE80;  --ok-soft:   #14301F;
+  --warn:    #FBBF24;  --warn-soft: #33270B;
+  --err:     #F87171;  --err-soft:  #3A1618;
+  --glow: radial-gradient(700px 380px at 50% -6%, rgba(37,99,235,.45), transparent 60%);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.30), 0 8px 24px rgba(0,0,0,.35);
+  --shadow-pop:  0 8px 16px rgba(0,0,0,.40), 0 24px 48px rgba(0,0,0,.45);
+  --cite-bg: #23345C; --cite-fg: #A6C6FF; --cite-border: #38508A;
+}
+
+/* ── Design-Tokens: LIGHT — überschreibt den Default ──────────────────────── */
+[data-mode="light"] {
+  --brand-50:  #EEF3FF;
+  --brand-100: #DBE7FF;
+  --brand-600: #2563EB;   /* RelationFlow Primär */
+  --brand-700: #1D4ED8;   /* RelationFlow Hover  */
+  --accent:      #FAEF70; /* Everlast Gold       */
+  --accent-soft: #FEFDE8;
+  --accent-ink:  #8A8030;
+  --ink:        #0E1424;
+  --muted-ink:  #5A6472;
+  --faint-ink:  #8A93A3;
+  --surface:    #FFFFFF;
+  --surface-2:  #F2F5F9;
+  --canvas:     #F7F4EE;  /* warmes Off-White, NotebookLM-Anmutung */
+  --hairline:   #E4E9F2;
+  --ok:      #16A34A;  --ok-soft:   #E7F6EE;
+  --warn:    #B45309;  --warn-soft: #FBEEE6;
+  --err:     #DC2626;  --err-soft:  #FEECEC;
+  --glow: radial-gradient(60% 70% at 50% 30%, rgba(37,99,235,.08), transparent 70%);
+  --shadow-card: 0 1px 2px rgba(14,20,36,.04), 0 8px 24px rgba(14,20,36,.06);
+  --shadow-pop:  0 8px 16px rgba(14,20,36,.08), 0 24px 48px rgba(14,20,36,.10);
+  --cite-bg: #EEF3FF; --cite-fg: #1D4ED8; --cite-border: #C7D9FF;
+}
+
+/* Radien und Typo sind modus-unabhängig */
+:root {
+  --r-card: 16px; --r-control: 12px; --r-pill: 999px; --r-sm: 8px;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: 'Lora', ui-serif, Georgia, serif;
+}
+
+/* ── Canvas-Chrome (nur dieses Dokument, kein Produkt-Design) ─────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0; background: #14161C; color: #C8CEDA;
+  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding: 14px 28px; background: #0E1014EE; backdrop-filter: blur(12px);
+  border-bottom: 1px solid #262A33;
+}
+.bar h1 { font-size: 15px; font-weight: 800; color: #fff; margin: 0; letter-spacing: -.01em; }
+.bar h1 span { color: #5B8DEF; }
+.bar nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.bar nav a {
+  color: #98A0B0; text-decoration: none; font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: 7px;
+}
+.bar nav a:hover { color: #fff; background: #22262F; }
+.bar .spacer { flex: 1; }
+.modeToggle {
+  display: flex; gap: 3px; padding: 3px; background: #22262F;
+  border-radius: var(--r-pill); border: 1px solid #313743;
+}
+.modeToggle button {
+  border: 0; background: transparent; color: #98A0B0; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 700; padding: 5px 14px;
+  border-radius: var(--r-pill);
+}
+.modeToggle button[aria-pressed="true"] { background: #5B8DEF; color: #fff; }
+
+main { padding: 32px 28px 120px; max-width: 1560px; margin: 0 auto; }
+.board { margin-bottom: 52px; scroll-margin-top: 80px; }
+.board > header { margin-bottom: 14px; }
+.board .num {
+  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .1em;
+  color: #5B8DEF; background: #1A2440; padding: 3px 8px; border-radius: 6px;
+}
+.board > header h2 { margin: 8px 0 4px; font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -.02em; }
+.board > header .why { margin: 0; max-width: 78ch; color: #8B93A3; font-size: 13px; }
+.board > header .why b { color: #C8CEDA; font-weight: 700; }
+
+/* Artboard = eine gerahmte Fläche, die das echte Produkt-Design trägt */
+.art {
+  background: var(--canvas); color: var(--ink);
+  border: 1px solid #2A2F3A; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,.35);
+}
+.art.pad { padding: 28px; }
+.art.glow { background-image: var(--glow); background-repeat: no-repeat; }
+.artLabel {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #6E7686; margin: 0 0 8px 2px;
+}
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 1100px) { .duo, .trio { grid-template-columns: 1fr; } }
+
+/* ── Produkt-Primitives (das ist das echte Design) ────────────────────────── */
+.n-card {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-card); box-shadow: var(--shadow-card);
+}
+.n-btn {
+  font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  border-radius: var(--r-control); padding: 10px 18px; border: 1px solid transparent;
+  display: inline-flex; align-items: center; gap: 8px; line-height: 1.2;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.n-btn--primary  { background: var(--brand-600); color: #fff; }
+.n-btn--primary:hover { background: var(--brand-700); }
+.n-btn--secondary{ background: var(--surface); color: var(--ink); border-color: var(--hairline); }
+.n-btn--secondary:hover { background: var(--surface-2); }
+.n-btn--ghost    { background: transparent; color: var(--muted-ink); }
+.n-btn--ghost:hover { background: var(--surface-2); color: var(--ink); }
+.n-btn--danger   { background: transparent; color: var(--err); border-color: var(--hairline); }
+.n-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.n-btn:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; }
+
+.n-input {
+  font: inherit; width: 100%; padding: 10px 14px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-control);
+}
+.n-input::placeholder { color: var(--faint-ink); }
+.n-input:focus { outline: 2px solid var(--brand-600); outline-offset: 1px; border-color: transparent; }
+
+.n-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill);
+}
+.n-badge--ready { background: var(--ok-soft);   color: var(--ok); }
+.n-badge--work  { background: var(--brand-50);  color: var(--brand-600); }
+.n-badge--wait  { background: var(--surface-2); color: var(--muted-ink); }
+.n-badge--err   { background: var(--err-soft);  color: var(--err); }
+/* Gold-Disziplin: Gold markiert genau drei Dinge. Dies ist Stelle 1 von 3. */
+.n-badge--gold  { background: var(--accent-soft); color: var(--accent-ink); border: 1px solid var(--accent); }
+
+.n-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* Zitat-Chip — Stelle 2 von 3 für Gold */
+.n-cite {
+  font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
+  vertical-align: baseline; padding: 1px 7px; margin: 0 1px;
+  border-radius: var(--r-pill); border: 1px solid var(--cite-border);
+  background: var(--cite-bg); color: var(--cite-fg);
+}
+.n-cite:hover, .n-cite[aria-current="true"] {
+  background: var(--accent); border-color: var(--accent); color: #3D390F;
+}
+
+.n-h1 { font-size: 44px; line-height: 1.06; font-weight: 800; letter-spacing: -.03em; margin: 0; }
+.n-serif { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--muted-ink); }
+.n-h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+.n-h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.n-body { font-size: 14px; color: var(--muted-ink); margin: 0; }
+.n-small { font-size: 12px; color: var(--faint-ink); margin: 0; }
+
+.sw { display: flex; flex-direction: column; gap: 6px; }
+.sw i { display: block; height: 52px; border-radius: 10px; border: 1px solid var(--hairline); }
+.sw code { font-size: 10.5px; color: var(--faint-ink); font-family: ui-monospace, monospace; }
+.sw b { font-size: 11.5px; font-weight: 700; color: var(--ink); }
+.swGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 14px; }
+
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row > .n-input { flex: 1 1 auto; width: auto; min-width: 0; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.sep { height: 1px; background: var(--hairline); margin: 20px 0; }
+.note {
+  font-size: 12px; color: var(--muted-ink); background: var(--surface-2);
+  border-left: 3px solid var(--brand-600); padding: 10px 14px; border-radius: 0 8px 8px 0;
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>Notabene <span>· Design Canvas</span></h1>
+  <nav>
+    <a href="#b1">Farben</a><a href="#b2">Typo</a><a href="#b3">Controls</a>
+    <a href="#b4">Quellen</a><a href="#b5">Chat</a><a href="#b6">Studio</a>
+    <a href="#b7">Datenfluss</a><a href="#b8">Desktop</a><a href="#b9">Tablet</a>
+    <a href="#b10">Mobile</a><a href="#b11">Landing</a><a href="#b12">Zustände</a>
+  </nav>
+  <span class="spacer"></span>
+  <div class="modeToggle" role="group" aria-label="Theme">
+    <button type="button" data-set="dark"  aria-pressed="true">Dark</button>
+    <button type="button" data-set="light" aria-pressed="false">Light</button>
+  </div>
+</div>
+
+<main>
+
+<!-- ══ 01 FARBEN ══════════════════════════════════════════════════════════ -->
+<section class="board" id="b1">
+  <header>
+    <span class="num">01</span>
+    <h2>Farbpalette</h2>
+    <p class="why">Blau von <b>relationflow.io</b>, Gold von <b>kiberatung.de</b>, warmes Off-White als Fläche für die
+      NotebookLM-Anmutung. Alle Werte per <code>getComputedStyle</code> aus den echten Seiten gelesen.
+      Der dunkle Modus ist nicht erfunden — <b>#0E1424 → #1B2640</b> ist exakt RelationFlows eigener Dark-Verlauf.
+      Komponenten benutzen ausschließlich die semantischen Namen, nie einen Hex-Wert — deshalb gibt es keinen
+      einzigen <code>dark:</code>-Prefix im Produktcode.</p>
+  </header>
+  <div class="duo">
+    <div>
+      <p class="artLabel">Light</p>
+      <div class="art pad" data-mode="light">
+        <div class="swGrid">
+          <div class="sw"><i style="background:var(--brand-600)"></i><b>brand-600</b><code>#2563EB</code></div>
+          <div class="sw"><i style="background:var(--brand-700)"></i><b>brand-700</b><code>#1D4ED8</code></div>
+          <div class="sw"><i style="background:var(--brand-50)"></i><b>brand-50</b><code>#EEF3FF</code></div>
+          <div class="sw"><i style="background:var(--accent)"></i><b>accent</b><code>#FAEF70</code></div>
+          <div class="sw"><i style="background:var(--accent-ink)"></i><b>accent-ink</b><code>#8A8030</code></div>
+          <div class="sw"><i style="background:var(--ink)"></i><b>ink</b><code>#0E1424</code></div>
+          <div class="sw"><i style="background:var(--muted-ink)"></i><b>muted-ink</b><code>#5A6472</code></div>
+          <div class="sw"><i style="background:var(--surface)"></i><b>surface</b><code>#FFFFFF</code></div>
+          <div class="sw"><i style="background:var(--canvas)"></i><b>canvas</b><code>#F7F4EE</code></div>
+          <div class="sw"><i style="background:var(--hairline)"></i><b>hairline</b><code>#E4E9F2</code></div>
+          <div class="sw"><i style="background:var(--ok)"></i><b>ok</b><code>#16A34A</code></div>
+          <div class="sw"><i style="background:var(--err)"></i><b>err</b><code>#DC2626</code></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="artLabel">Dark</p>
+      <div class="art pad" data-mode="dark">
+        <div class="swGrid">
+          <div class="sw"><i style="background:var(--brand-600)"></i><b>brand-600</b><code>#5B8DEF</code></div>
+          <div class="sw"><i style="background:var(--brand-700)"></i><b>brand-700</b><code>#7FB0FF</code></div>
+          <div class="sw"><i style="background:var(--brand-50)"></i><b>brand-50</b><code>#16203A</code></div>
+          <div class="sw"><i style="background:var(--accent)"></i><b>accent</b><code>#FAEF70</code></div>
+          <div class="sw"><i style="background:var(--accent-ink)"></i><b>accent-ink</b><code>#FAEF70</code></div>
+          <div class="sw"><i style="background:var(--ink)"></i><b>ink</b><code>#EDF1F7</code></div>
+          <div class="sw"><i style="background:var(--muted-ink)"></i><b>muted-ink</b><code>#A8B0BE</code></div>
+          <div class="sw"><i style="background:var(--surface)"></i><b>surface</b><code>#1B2640</code></div>
+          <div class="sw"><i style="background:var(--canvas)"></i><b>canvas</b><code>#0E1424</code></div>
+          <div class="sw"><i style="background:var(--hairline)"></i><b>hairline</b><code>#2A3550</code></div>
+          <div class="sw"><i style="background:var(--ok)"></i><b>ok</b><code>#4ADE80</code></div>
+          <div class="sw"><i style="background:var(--err)"></i><b>err</b><code>#F87171</code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="art pad">
+    <p class="n-h3" style="margin-bottom:10px">Gold-Disziplin — Gold ist Akzent, nicht Zweitfarbe</p>
+    <div class="row">
+      <span class="n-badge n-badge--gold"><span class="n-dot"></span>1 · Quelle bereit</span>
+      <span>2 · aktives Zitat <button class="n-cite" aria-current="true">3</button></span>
+      <span>3 · Studio-Akzentlinie <i style="display:inline-block;width:60px;height:3px;background:var(--accent);border-radius:2px;vertical-align:middle"></i></span>
+    </div>
+    <div class="sep"></div>
+    <p class="note">Diese drei Stellen stehen so in <code>CLAUDE.md</code>. Ohne diese Regel wird aus einem Akzent
+      innerhalb von zwei Wochen eine zweite Primärfarbe — und die Everlast-Referenz geht verloren.</p>
+  </div>
+</section>
+
+<!-- ══ 02 TYPOGRAFIE ══════════════════════════════════════════════════════ -->
+<section class="board" id="b2">
+  <header>
+    <span class="num">02</span>
+    <h2>Typografie</h2>
+    <p class="why"><b>Plus Jakarta Sans</b> (SIL OFL) als Ersatz für RelationFlows lizenzpflichtiges Satoshi —
+      geometrisch-humanistisch, optisch sehr nah. <b>Lora kursiv</b> übernimmt den Serif-Akzent, der bei RelationFlow
+      auf genau einem Wort der Headline liegt. Beide per <code>next/font/google</code> self-hosted:
+      kein externer Request, besserer Lighthouse-Wert, kein Third-Party in der DSGVO-Betrachtung.</p>
+  </header>
+  <div class="art pad glow">
+    <h1 class="n-h1">Deine Quellen, <span class="n-serif">verstanden</span></h1>
+    <div style="height:20px"></div>
+    <h2 class="n-h2">Abschnittsüberschrift · 24 / 800 / -0.02em</h2>
+    <div style="height:12px"></div>
+    <h3 class="n-h3">Karten-Titel · 16 / 700</h3>
+    <div style="height:12px"></div>
+    <p class="n-body" style="max-width:66ch">Fließtext · 14 / 400 / 1.55 auf <code>muted-ink</code>. Kontrast gegen
+      <code>surface</code> liegt in beiden Modi über 4,5:1 — das ist die Zeile, an der Lighthouse-Accessibility am
+      häufigsten scheitert.</p>
+    <div style="height:12px"></div>
+    <p class="n-small">Metazeile · 12 / 400 auf <code>faint-ink</code> — nur für Zeitstempel und Seitenzahlen,
+      nie für Inhalt.</p>
+  </div>
+</section>
+
+<!-- ══ 03 CONTROLS ════════════════════════════════════════════════════════ -->
+<section class="board" id="b3">
+  <header>
+    <span class="num">03</span>
+    <h2>Controls</h2>
+    <p class="why">Basis von shadcn/ui, Quelltext im Projekt statt als Dependency — jede Komponente bleibt erklärbar.
+      Radien: <b>16px Karte · 12px Control · 999px Pill</b>, direkt von RelationFlow übernommen.
+      Jeder Fokusring ist sichtbar; die Tastaturbedienung ist kein Nachtrag.</p>
+  </header>
+  <div class="duo">
+    <div class="art pad">
+      <p class="artLabel">Buttons</p>
+      <div class="row">
+        <button class="n-btn n-btn--primary">Quelle hinzufügen</button>
+        <button class="n-btn n-btn--secondary">Abbrechen</button>
+        <button class="n-btn n-btn--ghost">Mehr</button>
+        <button class="n-btn n-btn--danger">Löschen</button>
+      </div>
+      <div style="height:14px"></div>
+      <div class="row">
+        <button class="n-btn n-btn--primary" disabled>Audio Overview</button>
+        <span class="n-small">deaktiviert, weil Chat-Provider = Mistral (kein TTS)</span>
+      </div>
+      <div class="sep"></div>
+      <p class="artLabel">Eingabe</p>
+      <div class="col">
+        <input class="n-input" placeholder="Frage an deine Quellen …">
+        <input class="n-input" value="https://example.org/artikel" >
+      </div>
+    </div>
+    <div class="art pad">
+      <p class="artLabel">Status-Badges</p>
+      <div class="row">
+        <span class="n-badge n-badge--wait"><span class="n-dot"></span>Wartet</span>
+        <span class="n-badge n-badge--work"><span class="n-dot"></span>Wird verarbeitet</span>
+        <span class="n-badge n-badge--gold"><span class="n-dot"></span>Bereit</span>
+        <span class="n-badge n-badge--err"><span class="n-dot"></span>Fehlgeschlagen</span>
+      </div>
+      <div class="sep"></div>
+      <p class="artLabel">Zitat-Chips</p>
+      <p class="n-body" style="color:var(--ink)">Der Umsatz stieg um 14 %<button class="n-cite">1</button>, während die
+        Kosten konstant blieben<button class="n-cite" aria-current="true">2</button>.</p>
+      <p class="n-small">Chip 2 ist aktiv — Gold. Jeder Chip ist ein echter <code>&lt;button&gt;</code> mit
+        <code>aria-label="Quelle 2, Seite 17"</code>, kein gestyltes <code>&lt;span&gt;</code>.</p>
+      <div class="sep"></div>
+      <p class="artLabel">Radien</p>
+      <div class="row">
+        <span style="width:70px;height:44px;background:var(--brand-50);border:1px solid var(--hairline);border-radius:16px"></span>
+        <span style="width:70px;height:44px;background:var(--brand-50);border:1px solid var(--hairline);border-radius:12px"></span>
+        <span style="width:70px;height:44px;background:var(--brand-50);border:1px solid var(--hairline);border-radius:999px"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 04 QUELLENKARTE ════════════════════════════════════════════════════ -->
+<section class="board" id="b4">
+  <header>
+    <span class="num">04</span>
+    <h2>Quellenkarte — alle vier Zustände</h2>
+    <p class="why">Der Ingestion-Zustandsautomat ist im UI sichtbar, nicht versteckt. <b>Jeder Zustand hat eine
+      Darstellung</b> — auch der Fehlerfall, und der nennt den Grund und bietet genau eine Handlung an.
+      Ein Spinner ohne Ausweg ist im Testplan ein Fehler.</p>
+  </header>
+  <div class="art pad">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+
+      <div class="n-card" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+          <div style="display:flex;gap:10px"><input type="checkbox" checked style="margin-top:3px">
+            <div><p class="n-h3">Quartalsbericht Q3.pdf</p><p class="n-small">PDF · 42 Seiten · 128 Chunks</p></div>
+          </div>
+          <span class="n-badge n-badge--gold"><span class="n-dot"></span>Bereit</span>
+        </div>
+        <div style="height:10px"></div>
+        <p class="n-body" style="font-size:13px">Umsatzentwicklung, Kostenstruktur und Ausblick für das dritte
+          Quartal. Schwerpunkt auf der Margenentwicklung im Dienstleistungssegment.</p>
+        <div style="height:10px"></div>
+        <div class="row">
+          <span class="n-badge n-badge--wait">Umsatz</span>
+          <span class="n-badge n-badge--wait">Marge</span>
+          <span class="n-badge n-badge--wait">Ausblick</span>
+        </div>
+      </div>
+
+      <div class="n-card" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+          <div style="display:flex;gap:10px"><input type="checkbox" disabled style="margin-top:3px">
+            <div><p class="n-h3">Marktanalyse 2026.pdf</p><p class="n-small">PDF · 18 Seiten</p></div>
+          </div>
+          <span class="n-badge n-badge--work"><span class="n-dot"></span>Verarbeitung</span>
+        </div>
+        <div style="height:12px"></div>
+        <div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden">
+          <div style="width:62%;height:100%;background:var(--brand-600)"></div>
+        </div>
+        <p class="n-small" style="margin-top:8px">Schritt 3 von 5 · Embeddings (Mistral, EU)</p>
+      </div>
+
+      <div class="n-card" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+          <div style="display:flex;gap:10px"><input type="checkbox" disabled style="margin-top:3px">
+            <div><p class="n-h3">notizen.md</p><p class="n-small">Markdown · in Warteschlange</p></div>
+          </div>
+          <span class="n-badge n-badge--wait"><span class="n-dot"></span>Wartet</span>
+        </div>
+      </div>
+
+      <div class="n-card" style="padding:16px;border-color:var(--err)">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+          <div style="display:flex;gap:10px"><input type="checkbox" disabled style="margin-top:3px">
+            <div><p class="n-h3">scan_vertrag.pdf</p><p class="n-small">PDF · 6 Seiten</p></div>
+          </div>
+          <span class="n-badge n-badge--err"><span class="n-dot"></span>Fehlgeschlagen</span>
+        </div>
+        <div style="height:10px"></div>
+        <p class="n-body" style="font-size:13px;color:var(--err)">Dieses PDF enthält keine Textebene — es ist
+          vermutlich ein Scan. Texterkennung wird nicht unterstützt.</p>
+        <div style="height:10px"></div>
+        <button class="n-btn n-btn--secondary" style="padding:7px 14px;font-size:13px">Entfernen</button>
+      </div>
+
+    </div>
+    <div class="sep"></div>
+    <p class="note">Der leere Zustand für „Verarbeitung" hat einen Zeitanker: bleibt eine Quelle länger als
+      5 Minuten hängen, greift der pg_cron-Reaper. Das UI zeigt dann „Neuer Versuch (2 von 3)" statt weiter zu drehen.</p>
+  </div>
+</section>
+
+<!-- ══ 05 CHAT ════════════════════════════════════════════════════════════ -->
+<section class="board" id="b5">
+  <header>
+    <span class="num">05</span>
+    <h2>Chat mit Zitaten</h2>
+    <p class="why">Das Kernversprechen: <b>keine Aussage ohne Beleg</b>. Die Zitat-Chips kommen als eigener
+      Stream-Teil, bevor der erste Buchstabe der Antwort da ist — sie sind also sofort sichtbar und nicht erst am Ende.
+      Klick auf einen Chip öffnet die Quelle und markiert die exakte Textstelle über
+      <code>char_start</code>/<code>char_end</code>, die beim Chunking mitgeschrieben wurden.</p>
+  </header>
+  <div class="duo">
+    <div class="art pad">
+      <p class="artLabel">Antwort mit Belegen</p>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+        <div style="background:var(--brand-600);color:#fff;padding:10px 16px;border-radius:16px 16px 4px 16px;max-width:78%;font-size:14px">
+          Wie hat sich die Marge im Dienstleistungssegment entwickelt?
+        </div>
+      </div>
+      <div class="n-card" style="padding:16px;max-width:88%">
+        <p class="n-body" style="color:var(--ink)">Die Marge im Dienstleistungssegment stieg von 18,2 % auf
+          <b>21,4 %</b><button class="n-cite">1</button>. Getragen wurde das vor allem von höheren Tagessätzen bei
+          gleichbleibenden Personalkosten<button class="n-cite" aria-current="true">2</button>. Für das vierte Quartal
+          erwartet das Management eine Stabilisierung auf diesem Niveau<button class="n-cite">3</button>.</p>
+        <div class="sep" style="margin:14px 0"></div>
+        <p class="artLabel" style="margin-bottom:8px">Belege</p>
+        <div class="col" style="gap:6px">
+          <p class="n-small"><b style="color:var(--brand-600)">1</b> &nbsp;Quartalsbericht Q3.pdf · Seite 12</p>
+          <p class="n-small"><b style="color:var(--accent-ink)">2</b> &nbsp;Quartalsbericht Q3.pdf · Seite 14</p>
+          <p class="n-small"><b style="color:var(--brand-600)">3</b> &nbsp;Marktanalyse 2026.pdf · Seite 5</p>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <div class="row">
+          <button class="n-btn n-btn--ghost" style="padding:6px 12px;font-size:13px">Als Notiz speichern</button>
+          <button class="n-btn n-btn--ghost" style="padding:6px 12px;font-size:13px">Kopieren</button>
+        </div>
+      </div>
+    </div>
+    <div class="art pad">
+      <p class="artLabel">Streaming &amp; Grenzfall</p>
+      <div class="n-card" style="padding:16px">
+        <p class="n-small" style="margin-bottom:8px">Antwort läuft ein</p>
+        <p class="n-body" style="color:var(--ink)">Die Marge im Dienstleistungssegment stieg von 18,2 %
+          <span style="display:inline-block;width:8px;height:16px;background:var(--brand-600);vertical-align:-3px;animation:bl 1s steps(2) infinite"></span></p>
+      </div>
+      <div style="height:14px"></div>
+      <div class="n-card" style="padding:16px">
+        <p class="n-body" style="color:var(--ink)">Dazu steht nichts in den ausgewählten Quellen. Zwei weitere Quellen
+          dieses Notebooks sind aktuell abgewählt — möglicherweise findet sich die Antwort dort.</p>
+        <div style="height:10px"></div>
+        <button class="n-btn n-btn--secondary" style="padding:7px 14px;font-size:13px">Alle Quellen auswählen</button>
+      </div>
+      <div class="sep"></div>
+      <p class="note"><b>Das ist der wichtigste Zustand des ganzen Produkts.</b> Ein RAG-System, das bei fehlendem
+        Beleg trotzdem antwortet, ist wertlos. Der Testplan prüft ihn explizit: Quelle abwählen, dieselbe Frage
+        stellen, diese Antwort erwarten.</p>
+      <div style="height:12px"></div>
+      <p class="n-small">Der Nachrichten-Container trägt <code>aria-live="polite"</code> — ohne das hören Screenreader
+        von einer gestreamten Antwort gar nichts.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 06 STUDIO ══════════════════════════════════════════════════════════ -->
+<section class="board" id="b6">
+  <header>
+    <span class="num">06</span>
+    <h2>Studio — Audio Overview</h2>
+    <p class="why">Das 110-%-Feature: ein zweistimmiger Podcast über die ausgewählten Quellen.
+      Zwei Sprecher, mehr kann die API nicht. Gedeckelt auf <b>3 Minuten</b> — nicht aus Bequemlichkeit, sondern
+      weil WAV bei 24 kHz 2,88 MB pro Minute frisst und 1 GB Supabase-Storage sonst nach ~34 Overviews voll ist.
+      Ausgeliefert wird MP3 über eine Signed URL, nie durch eine Vercel-Function (4,5-MB-Limit).</p>
+  </header>
+  <div class="trio">
+    <div class="art pad">
+      <p class="artLabel">Bereit zum Erzeugen</p>
+      <div class="n-card" style="padding:16px;border-top:3px solid var(--accent)">
+        <p class="n-h3">Audio Overview</p>
+        <p class="n-body" style="font-size:13px;margin-top:6px">Zwei Stimmen fassen die 3 ausgewählten Quellen in
+          etwa 3 Minuten zusammen.</p>
+        <div style="height:12px"></div>
+        <button class="n-btn n-btn--primary" style="width:100%;justify-content:center">Erzeugen</button>
+        <p class="n-small" style="margin-top:8px">Läuft über Google Gemini · ca. 1–3 Minuten</p>
+      </div>
+    </div>
+    <div class="art pad">
+      <p class="artLabel">Fertig</p>
+      <div class="n-card" style="padding:16px;border-top:3px solid var(--accent)">
+        <p class="n-h3">Audio Overview</p>
+        <p class="n-small" style="margin-top:4px">2:47 · MP3 · 0,3 MB</p>
+        <div style="height:14px"></div>
+        <div class="row" style="gap:12px">
+          <span style="width:38px;height:38px;border-radius:50%;background:var(--brand-600);display:grid;place-items:center;color:#fff;font-size:13px">▶</span>
+          <div style="flex:1;height:4px;background:var(--surface-2);border-radius:2px;position:relative">
+            <div style="width:34%;height:100%;background:var(--brand-600);border-radius:2px"></div>
+            <span style="position:absolute;left:34%;top:-4px;width:12px;height:12px;border-radius:50%;background:var(--brand-600)"></span>
+          </div>
+          <span class="n-small">0:57</span>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <p class="artLabel" style="margin-bottom:8px">Transkript</p>
+        <p class="n-small"><b style="color:var(--brand-600)">Alex</b> — Der spannendste Wert im Bericht ist die
+          Marge im Dienstleistungssegment.</p>
+        <p class="n-small" style="margin-top:6px"><b style="color:var(--accent-ink)">Sam</b> — Von 18,2 auf 21,4 Prozent,
+          und das ohne höhere Personalkosten.</p>
+      </div>
+    </div>
+    <div class="art pad">
+      <p class="artLabel">Fehlerpfad · script_only</p>
+      <div class="n-card" style="padding:16px;border-top:3px solid var(--warn)">
+        <p class="n-h3">Audio Overview</p>
+        <span class="n-badge n-badge--wait" style="margin-top:8px;background:var(--warn-soft);color:var(--warn)">
+          <span class="n-dot"></span>Nur Transkript</span>
+        <div style="height:10px"></div>
+        <p class="n-body" style="font-size:13px">Das Tageskontingent für die Sprachausgabe ist erschöpft.
+          Das Skript wurde trotzdem erzeugt und ist unten lesbar.</p>
+        <div style="height:10px"></div>
+        <button class="n-btn n-btn--secondary" style="width:100%;justify-content:center;font-size:13px">Transkript öffnen</button>
+      </div>
+      <div style="height:12px"></div>
+      <p class="note">Kein Spinner ins Leere. Wenn TTS scheitert, hat der Nutzer trotzdem etwas in der Hand —
+        das kostet zwanzig Zeilen und rettet die Demo, falls das Free-Tier-Kontingent im falschen Moment leer ist.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 07 DATENFLUSS ══════════════════════════════════════════════════════ -->
+<section class="board" id="b7">
+  <header>
+    <span class="num">07</span>
+    <h2>Datenfluss-Panel</h2>
+    <p class="why">Everlast wirbt mit DSGVO-Konformität und EU-Hosting. Ein grüner Haken wäre billig — dieses Panel
+      sagt stattdessen pro Einstellung <b>die Wahrheit</b>: welcher Anbieter sieht was.
+      Embeddings laufen immer über Mistral in der EU, weil das der einzige Schritt ist, der <i>jede Quelle
+      vollständig</i> durch einen Anbieter schickt. Das Chat-Modell ist wechselbar, das Embedding-Modell nicht —
+      ein Vektorraum lässt sich nicht mischen.</p>
+  </header>
+  <div class="duo">
+    <div class="art pad">
+      <p class="artLabel">Chat = Gemini (Standard)</p>
+      <div class="n-card" style="padding:18px">
+        <div class="row" style="justify-content:space-between">
+          <p class="n-h3">Datenfluss</p>
+          <span class="n-badge n-badge--work">Google + EU</span>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <div class="col" style="gap:12px">
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--ink)">Indexierung deiner Quellen</span><span class="n-badge n-badge--ready">Mistral · EU</span></div>
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--ink)">Antworten im Chat</span><span class="n-badge n-badge--work">Google</span></div>
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--ink)">Audio Overview</span><span class="n-badge n-badge--work">Google</span></div>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <p class="n-small">Deine Quellen werden in der EU indexiert. Für Antworten und Audio werden die jeweils
+          relevanten Ausschnitte an Google übertragen. Google nutzt Daten des kostenlosen Kontingents zur
+          Produktverbesserung.</p>
+      </div>
+    </div>
+    <div class="art pad">
+      <p class="artLabel">Chat = Mistral</p>
+      <div class="n-card" style="padding:18px;border-color:var(--ok)">
+        <div class="row" style="justify-content:space-between">
+          <p class="n-h3">Datenfluss</p>
+          <span class="n-badge n-badge--ready">Vollständig EU</span>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <div class="col" style="gap:12px">
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--ink)">Indexierung deiner Quellen</span><span class="n-badge n-badge--ready">Mistral · EU</span></div>
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--ink)">Antworten im Chat</span><span class="n-badge n-badge--ready">Mistral · EU</span></div>
+          <div class="row" style="justify-content:space-between"><span class="n-body" style="color:var(--muted-ink)">Audio Overview</span><span class="n-badge n-badge--wait">nicht verfügbar</span></div>
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <p class="n-small">Keine Daten verlassen die EU. Audio Overview benötigt Google Gemini und ist in dieser
+          Einstellung deaktiviert.</p>
+      </div>
+      <div style="height:12px"></div>
+      <p class="note">Das Deaktivieren ist kein Sonderfall im Code: die Provider-Registry trägt pro Anbieter ein
+        <code>capabilities</code>-Flag, und das UI liest es. Zwei Einträge in einem Record — kein Plugin-System.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 08 DESKTOP ═════════════════════════════════════════════════════════ -->
+<section class="board" id="b8">
+  <header>
+    <span class="num">08</span>
+    <h2>Desktop ≥ 1280 px — drei Spalten</h2>
+    <p class="why">Quellen links, Chat in der Mitte, Studio rechts. Die Chat-Spalte wächst, die Seitenspalten haben
+      feste Breiten. <b>Ein Layout, drei Ausprägungen</b> — Tablet und Mobile sind unten dasselbe Markup mit anderen
+      Breakpoints, kein separater Mobile-Code.</p>
+  </header>
+  <div class="art">
+    <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <b style="font-size:15px;letter-spacing:-.01em">Notabene</b>
+      <span class="n-small">/</span>
+      <span class="n-body" style="color:var(--ink)">📊 Quartalsanalyse Q3</span>
+      <span style="flex:1"></span>
+      <span class="n-badge n-badge--work">Gemini</span>
+      <span class="n-btn n-btn--ghost" style="padding:6px 10px">☾</span>
+      <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-600)"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:264px 1fr 300px;min-height:380px">
+      <aside style="border-right:1px solid var(--hairline);padding:14px;background:var(--surface)">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <p class="artLabel" style="margin:0">Quellen · 3</p>
+          <button class="n-btn n-btn--primary" style="padding:4px 10px;font-size:12px">+</button>
+        </div>
+        <div class="col" style="gap:8px">
+          <label class="n-card" style="padding:10px;display:flex;gap:8px;align-items:start;cursor:pointer">
+            <input type="checkbox" checked><div><p style="font-size:13px;font-weight:600;margin:0">Quartalsbericht Q3.pdf</p><span class="n-badge n-badge--gold" style="font-size:10px;padding:2px 7px;margin-top:4px"><span class="n-dot"></span>Bereit</span></div>
+          </label>
+          <label class="n-card" style="padding:10px;display:flex;gap:8px;align-items:start;cursor:pointer">
+            <input type="checkbox" checked><div><p style="font-size:13px;font-weight:600;margin:0">Marktanalyse 2026.pdf</p><span class="n-badge n-badge--gold" style="font-size:10px;padding:2px 7px;margin-top:4px"><span class="n-dot"></span>Bereit</span></div>
+          </label>
+          <label class="n-card" style="padding:10px;display:flex;gap:8px;align-items:start;cursor:pointer;opacity:.7">
+            <input type="checkbox"><div><p style="font-size:13px;font-weight:600;margin:0">notizen.md</p><span class="n-badge n-badge--wait" style="font-size:10px;padding:2px 7px;margin-top:4px"><span class="n-dot"></span>Abgewählt</span></div>
+          </label>
+        </div>
+      </aside>
+      <section style="padding:18px;display:flex;flex-direction:column;background-image:var(--glow);background-repeat:no-repeat">
+        <div style="flex:1">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+            <div style="background:var(--brand-600);color:#fff;padding:9px 14px;border-radius:14px 14px 4px 14px;font-size:13px;max-width:70%">Wie hat sich die Marge entwickelt?</div>
+          </div>
+          <div class="n-card" style="padding:14px;max-width:88%">
+            <p style="font-size:13px;margin:0;color:var(--ink)">Die Marge stieg von 18,2 % auf 21,4 %<button class="n-cite">1</button>, getragen von höheren Tagessätzen<button class="n-cite" aria-current="true">2</button>.</p>
+          </div>
+        </div>
+        <div class="row" style="gap:8px;margin-top:14px">
+          <input class="n-input" placeholder="Frage an 2 ausgewählte Quellen …">
+          <button class="n-btn n-btn--primary">↑</button>
+        </div>
+      </section>
+      <aside style="border-left:1px solid var(--hairline);padding:14px;background:var(--surface)">
+        <p class="artLabel">Studio</p>
+        <div class="n-card" style="padding:12px;border-top:3px solid var(--accent);margin-bottom:10px">
+          <p style="font-size:13px;font-weight:700;margin:0">Audio Overview</p>
+          <p class="n-small" style="margin-top:2px">2:47 · bereit</p>
+        </div>
+        <div class="n-card" style="padding:12px;margin-bottom:10px"><p style="font-size:13px;font-weight:700;margin:0">Mind Map</p><p class="n-small">noch nicht erzeugt</p></div>
+        <div class="sep" style="margin:14px 0"></div>
+        <p class="artLabel">Notizen · 2</p>
+        <div class="n-card" style="padding:10px;margin-bottom:8px"><p style="font-size:12.5px;margin:0">Margenentwicklung Q3 → Q4</p></div>
+        <div class="n-card" style="padding:10px"><p style="font-size:12.5px;margin:0">Offene Frage: Personalkosten</p></div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 09/10 TABLET + MOBILE ══════════════════════════════════════════════ -->
+<section class="board" id="b9">
+  <header>
+    <span class="num">09 / 10</span>
+    <h2>Tablet 768–1279 px &amp; Mobile &lt; 768 px</h2>
+    <p class="why">Tablet: Quellen einklappbar, Studio als Sheet von rechts. Mobile: Tab-Bar unten, <b>Chat ist der
+      Default-Tab</b> — wer die App auf dem Handy öffnet, will fragen, nicht verwalten.
+      <code>c1-responsive.spec.ts</code> fährt alle drei Viewports gegen dieselben Flows.</p>
+  </header>
+  <div class="duo">
+    <div>
+      <p class="artLabel">Tablet · 900 px</p>
+      <div class="art">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+          <span class="n-btn n-btn--ghost" style="padding:4px 9px">☰</span>
+          <b style="font-size:14px">📊 Quartalsanalyse Q3</b>
+          <span style="flex:1"></span>
+          <span class="n-btn n-btn--ghost" style="padding:4px 9px">☾</span>
+          <span class="n-btn n-btn--secondary" style="padding:5px 11px;font-size:12px">Studio</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 260px;min-height:260px">
+          <section style="padding:14px;display:flex;flex-direction:column">
+            <div style="flex:1">
+              <div class="n-card" style="padding:12px;max-width:92%">
+                <p style="font-size:13px;margin:0;color:var(--ink)">Die Marge stieg auf 21,4 %<button class="n-cite">1</button>.</p>
+              </div>
+            </div>
+            <div class="row" style="gap:8px;margin-top:12px"><input class="n-input" placeholder="Frage …"><button class="n-btn n-btn--primary">↑</button></div>
+          </section>
+          <aside style="border-left:1px solid var(--hairline);background:var(--surface);padding:12px;box-shadow:var(--shadow-pop)">
+            <p class="artLabel">Studio · Sheet</p>
+            <div class="n-card" style="padding:10px;border-top:3px solid var(--accent)"><p style="font-size:12.5px;font-weight:700;margin:0">Audio Overview</p><p class="n-small">2:47</p></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <div id="b10">
+      <p class="artLabel">Mobile · 390 px</p>
+      <div class="art" style="max-width:390px;margin:0 auto">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+          <b style="font-size:14px;flex:1">📊 Quartalsanalyse</b>
+          <span class="n-btn n-btn--ghost" style="padding:4px 8px">☾</span>
+        </div>
+        <div style="padding:14px;min-height:230px;display:flex;flex-direction:column">
+          <div style="flex:1">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+              <div style="background:var(--brand-600);color:#fff;padding:8px 12px;border-radius:13px 13px 4px 13px;font-size:13px">Wie war die Marge?</div>
+            </div>
+            <div class="n-card" style="padding:12px">
+              <p style="font-size:13px;margin:0;color:var(--ink)">Von 18,2 % auf 21,4 %<button class="n-cite" aria-current="true">1</button>.</p>
+            </div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:12px"><input class="n-input" placeholder="Frage …"><button class="n-btn n-btn--primary">↑</button></div>
+        </div>
+        <nav style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--hairline);background:var(--surface)">
+          <span style="padding:10px;text-align:center;font-size:12px;color:var(--muted-ink)">Quellen<br><span class="n-small">3</span></span>
+          <span style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:var(--brand-600);border-top:2px solid var(--brand-600);margin-top:-1px">Chat</span>
+          <span style="padding:10px;text-align:center;font-size:12px;color:var(--muted-ink)">Studio<br><span class="n-small">1</span></span>
+        </nav>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 11 LANDING ═════════════════════════════════════════════════════════ -->
+<section class="board" id="b11">
+  <header>
+    <span class="num">11</span>
+    <h2>Landing Page</h2>
+    <p class="why">Statisch server-gerendert, <b>kein Client-JS außer Theme-Toggle und Sign-in</b>. Hier werden die
+      Lighthouse-Werte geholt: JSON-LD, sitemap, robots, <code>llms.txt</code>, OG-Bild, self-hosted Fonts.
+      Der schwere Chat-Client liegt ausschließlich hinter <code>/app</code>.
+      Die Pill-Navigation mit Schatten und der kursive Serif-Akzent auf genau einem Wort sind direkt von
+      RelationFlow übernommen.</p>
+  </header>
+  <div class="art glow" style="padding:0">
+    <div style="display:flex;justify-content:center;padding:18px">
+      <div class="n-card" style="display:flex;align-items:center;gap:22px;padding:9px 9px 9px 20px;border-radius:var(--r-pill);box-shadow:var(--shadow-pop)">
+        <b style="font-size:15px;letter-spacing:-.01em">Notabene</b>
+        <span class="n-small" style="font-size:11px;font-weight:700;border:1px solid var(--hairline);padding:1px 7px;border-radius:var(--r-pill)">BETA</span>
+        <span class="n-body" style="font-size:13px">Funktionen</span>
+        <span class="n-body" style="font-size:13px">Datenschutz</span>
+        <span class="n-body" style="font-size:13px">Anmelden</span>
+        <button class="n-btn n-btn--primary" style="border-radius:var(--r-pill);padding:8px 18px;font-size:13px">Kostenlos starten</button>
+      </div>
+    </div>
+    <div style="text-align:center;padding:38px 24px 48px">
+      <h1 class="n-h1" style="max-width:16ch;margin:0 auto">Deine Quellen, <span class="n-serif">verstanden</span></h1>
+      <div style="height:16px"></div>
+      <p class="n-body" style="max-width:56ch;margin:0 auto;font-size:16px">Lade Dokumente hoch und stelle Fragen.
+        Jede Antwort ist belegt — mit einem Klick zur exakten Stelle in der Quelle.</p>
+      <div style="height:22px"></div>
+      <div class="row" style="justify-content:center">
+        <button class="n-btn n-btn--primary" style="border-radius:var(--r-pill);padding:12px 24px">Kostenlos starten</button>
+        <button class="n-btn n-btn--secondary" style="border-radius:var(--r-pill);padding:12px 24px">Demo ansehen</button>
+      </div>
+      <div style="height:18px"></div>
+      <div class="row" style="justify-content:center;gap:8px">
+        <span class="n-badge n-badge--ready">Indexierung in der EU</span>
+        <span class="n-badge n-badge--wait">Kein Training auf deinen Daten</span>
+        <span class="n-badge n-badge--gold">Belegte Antworten</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 12 ZUSTÄNDE ════════════════════════════════════════════════════════ -->
+<section class="board" id="b12">
+  <header>
+    <span class="num">12</span>
+    <h2>Leer-, Lade- und Fehlerzustände</h2>
+    <p class="why">Diese drei entstehen zuletzt und entscheiden, ob eine Demo souverän wirkt.
+      Regel aus <code>CLAUDE.md</code>: <b>jeder Zustand hat eine Darstellung, und jeder Fehler nennt den Grund
+      und genau eine Handlung.</b> Eine Sackgassen-Fehlermeldung ist im Testplan ein Fehler, kein Schönheitsmangel.</p>
+  </header>
+  <div class="trio">
+    <div class="art pad" style="display:grid;place-items:center;min-height:220px;text-align:center">
+      <div>
+        <div style="font-size:34px">📄</div>
+        <p class="n-h3" style="margin-top:10px">Noch keine Quellen</p>
+        <p class="n-body" style="font-size:13px;max-width:30ch;margin:6px auto 0">Lade ein PDF hoch, füge eine URL ein
+          oder tippe Text — danach kannst du Fragen stellen.</p>
+        <div style="height:14px"></div>
+        <button class="n-btn n-btn--primary">Erste Quelle hinzufügen</button>
+      </div>
+    </div>
+    <div class="art pad" style="min-height:220px">
+      <p class="artLabel">Skeleton statt Spinner</p>
+      <div class="col" style="gap:10px">
+        <div class="n-card" style="padding:14px">
+          <div style="height:12px;width:62%;background:var(--surface-2);border-radius:6px"></div>
+          <div style="height:9px;width:38%;background:var(--surface-2);border-radius:6px;margin-top:9px"></div>
+        </div>
+        <div class="n-card" style="padding:14px">
+          <div style="height:12px;width:74%;background:var(--surface-2);border-radius:6px"></div>
+          <div style="height:9px;width:44%;background:var(--surface-2);border-radius:6px;margin-top:9px"></div>
+        </div>
+      </div>
+      <p class="n-small" style="margin-top:12px">Skeletons haben die Maße des echten Inhalts — das verhindert den
+        Layout-Sprung, der bei Lighthouse als CLS zählt.</p>
+    </div>
+    <div class="art pad" style="min-height:220px">
+      <p class="artLabel">Fehler mit Ausweg</p>
+      <div class="n-card" style="padding:16px;border-color:var(--err)">
+        <p class="n-h3" style="color:var(--err)">Antwort konnte nicht erzeugt werden</p>
+        <p class="n-body" style="font-size:13px;margin-top:8px">Das Modell hat nicht rechtzeitig geantwortet.
+          Deine Frage ist gespeichert.</p>
+        <div style="height:12px"></div>
+        <div class="row">
+          <button class="n-btn n-btn--primary" style="padding:7px 14px;font-size:13px">Erneut versuchen</button>
+          <button class="n-btn n-btn--ghost" style="padding:7px 14px;font-size:13px">Anbieter wechseln</button>
+        </div>
+      </div>
+      <p class="n-small" style="margin-top:12px">Grund genannt, Datenverlust ausgeschlossen, eine primäre Handlung
+        angeboten. Nie „Etwas ist schiefgelaufen".</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* Theme-Umschaltung für diesen Canvas. Artboards mit eigenem data-mode
+   (die Paletten-Gegenüberstellung in 01) bleiben davon unberührt — sie sind
+   fest verdrahtet, damit man Light und Dark immer nebeneinander sieht. */
+/* Die Hex-Werte unter den Farbfeldern werden aus den Tokens berechnet, nicht
+   von Hand gepflegt. Sonst driftet das Label vom tatsächlichen Wert ab, sobald
+   jemand ein Token anfasst — und ein Design-Canvas, der falsche Werte behauptet,
+   ist schlimmer als gar keiner. */
+const toHex = (rgb) => {
+  const m = rgb.match(/\d+/g);
+  return m ? '#' + m.slice(0, 3).map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase() : rgb;
+};
+document.querySelectorAll('.sw').forEach(sw => {
+  const token = sw.querySelector('b')?.textContent.trim();
+  const code = sw.querySelector('code');
+  if (!token || !code) return;
+  const scope = sw.closest('[data-mode]') || document.documentElement;
+  const value = getComputedStyle(scope).getPropertyValue('--' + token).trim();
+  if (!value) return;
+  // Über ein Hilfselement auflösen, damit auch benannte Farben zu Hex werden.
+  const probe = document.createElement('span');
+  probe.style.color = value; scope.appendChild(probe);
+  code.textContent = toHex(getComputedStyle(probe).color);
+  probe.remove();
+});
+
+const toggle = document.querySelector('.modeToggle');
+toggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-set]');
+  if (!btn) return;
+  document.documentElement.dataset.mode = btn.dataset.set;
+  toggle.querySelectorAll('button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b === btn)));
+});
+</script>
+<style>@keyframes bl { 0%,50% { opacity:1 } 50.01%,100% { opacity:0 } }</style>
+</body>
+</html>
