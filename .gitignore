@@ -1,9 +1,44 @@
-node_modules/
-dist/
-.output/
-.nuxt/
-.DS_Store
-*.log
+# ─────────────────────────────────────────────────────────────────────────────
+# NICHT ENTFERNEN — privater Arbeitsordner.
+# _intern/ enthält Notizen, Prompts, Video-Skript und Vorbereitung, die bewusst
+# nicht Teil der Abgabe sind. Der Hook .claude/hooks/no-secrets.sh prüft
+# zusätzlich vor jedem git add/commit/push, dass daraus nichts in den Index
+# gerät — zwei unabhängige Netze.
+#
+# design/ ist bewusst NICHT ignoriert: der Design-Canvas gehört zur Abgabe und
+# belegt, dass die visuelle Richtung vor der ersten Komponente stand.
+# ─────────────────────────────────────────────────────────────────────────────
+_intern/
+
+# Secrets
 .env
 .env.*
 !.env.example
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build-Artefakte
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Test-Artefakte
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.lighthouseci/
+
+# Supabase (lokaler Stack)
+supabase/.branches/
+supabase/.temp/
+
+# Tooling
+.vercel/
+.DS_Store
+*.log
