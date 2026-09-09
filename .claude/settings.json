@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-secrets.sh\"",
+            "timeout": 15,
+            "statusMessage": "Prüfe auf Keys und private Dateien"
+          },
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/push-impact.sh\"",
+            "timeout": 15,
+            "statusMessage": "Schätze die Tragweite des Pushes ein"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-tests.sh\"",
+            "timeout": 15,
+            "statusMessage": "Prüfe, ob Tests mitgewachsen sind"
+          }
+        ]
+      }
+    ]
+  }
+}
