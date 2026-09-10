@@ -1,3 +1,10 @@
+/**
+ * Formular zum Anlegen eines Notebooks.
+ *
+ * Eine eigene Seite statt eines Dialogs: sie funktioniert ohne JavaScript, hat
+ * eine URL zum Verlinken, und der Zurück-Knopf tut das Erwartete. Bewusst kein
+ * Ladezustand — die Seite fragt nichts ab.
+ */
 import type { Metadata } from 'next'
 import Link from 'next/link'
 

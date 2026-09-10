@@ -1,12 +1,30 @@
+/**
+ * Ein Formular für Anlegen und Umbenennen eines Notebooks.
+ *
+ * Bewusst eines statt zweier: die beiden Fälle unterscheiden sich in Knopftext
+ * und Vorbelegung, nicht in Struktur, Validierung oder Barrierefreiheit.
+ */
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useId } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Notice } from '@/components/ui/notice'
 import type { FormState } from '@/lib/notebooks/actions'
 import { DESCRIPTION_MAX, EMOJI_MAX, TITLE_MAX } from '@/lib/notebooks/schema'
+
+/**
+ * `maxLength` zählt UTF-16-Einheiten, `EMOJI_MAX` zählt Code Points. Ein
+ * Code Point außerhalb der Basic Multilingual Plane belegt zwei Einheiten, und
+ * genau dort liegen die Emoji. Der Faktor gibt dem Browser-Limit denselben
+ * Spielraum, den die serverseitige Prüfung in Code Points erlaubt — sonst
+ * schnitte das Feld eine Flaggen-Sequenz beim Tippen ab, obwohl sie gültig ist.
+ */
+const EMOJI_MAX_UTF16_UNITS = EMOJI_MAX * 2
+
+/** Drei Zeilen zeigen eine typische Beschreibung ganz, ohne die Seite zu dehnen. */
+const DESCRIPTION_ROWS = 3
 
 /**
  * Ein Formular für Anlegen und Umbenennen.
@@ -29,6 +47,12 @@ export function NotebookForm({
   defaults?: { title?: string; emoji?: string | null; description?: string | null }
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, {})
+  // useId statt einer festen Zeichenkette: eine feste ID kollidiert, sobald
+  // irgendwo sonst auf der Seite dieselbe steht — dann zeigt das Label auf das
+  // falsche Element und das Feld verliert seinen zugänglichen Namen. Genau das
+  // ist hier passiert, als die Detailseite ihre Beschreibung mit derselben ID
+  // versah.
+  const descriptionId = useId()
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -38,7 +62,7 @@ export function NotebookForm({
             label="Symbol"
             name="emoji"
             defaultValue={defaults?.emoji ?? ''}
-            maxLength={EMOJI_MAX * 2}
+            maxLength={EMOJI_MAX_UTF16_UNITS}
             placeholder="📊"
             autoComplete="off"
           />
@@ -57,17 +81,17 @@ export function NotebookForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="notebook-description" className="text-sm font-semibold">
+        <label htmlFor={descriptionId} className="text-sm font-semibold">
           Beschreibung <span className="font-normal text-faint-ink">(optional)</span>
         </label>
         <textarea
-          id="notebook-description"
+          id={descriptionId}
           name="description"
-          rows={3}
+          rows={DESCRIPTION_ROWS}
           maxLength={DESCRIPTION_MAX}
           defaultValue={defaults?.description ?? ''}
           placeholder="Worum geht es in diesem Notebook?"
-          className="w-full rounded-control border border-hairline bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint-ink"
+          className="w-full rounded-control border border-hairline bg-surface px-3.5 py-2.5 text-base text-ink placeholder:text-faint-ink sm:text-sm"
         />
       </div>
 

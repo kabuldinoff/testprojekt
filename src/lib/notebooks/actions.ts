@@ -89,12 +89,24 @@ export async function updateNotebook(
   return {}
 }
 
-export async function deleteNotebook(notebookId: string) {
+export async function deleteNotebook(
+  notebookId: string,
+  _previous: FormState,
+  _formData: FormData
+): Promise<FormState> {
   const { supabase } = await requireUserId()
 
-  // Ein fremdes Notebook trifft die Policy nicht — der Aufruf tut dann
-  // schlicht nichts. Das ist der gewollte Ausgang, kein Fehler.
-  await supabase.from('notebooks').delete().eq('id', notebookId)
+  const { error } = await supabase.from('notebooks').delete().eq('id', notebookId)
+
+  // Zwei Ausgänge, die man leicht verwechselt. Ein **fremdes** Notebook trifft
+  // die Policy nicht: kein Fehler, keine gelöschte Zeile, und die Umleitung
+  // zur Übersicht ist genau richtig — es soll sich anfühlen wie „gibt es
+  // nicht". Ein **Fehler** dagegen heißt, das Notebook steht noch da. Ohne
+  // diese Unterscheidung landete der Nutzer in der Übersicht, sähe sein
+  // Notebook weiterhin und bekäme keinen Hinweis, warum.
+  if (error) {
+    return { error: 'Das Notebook konnte nicht gelöscht werden. Bitte erneut versuchen.' }
+  }
 
   revalidatePath('/app')
   redirect('/app')

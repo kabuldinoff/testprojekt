@@ -13,7 +13,7 @@ import { uniqueEmail } from './lib/supabase'
 
 const PASSWORD = 'test-passwort-1234'
 
-async function registriereUndMelde(page: Page) {
+async function registerAndSignIn(page: Page) {
   await page.goto('/registrieren')
   await page.getByLabel('E-Mail-Adresse').fill(uniqueEmail('notebook'))
   await page.getByLabel('Passwort').fill(PASSWORD)
@@ -22,7 +22,7 @@ async function registriereUndMelde(page: Page) {
 }
 
 test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
-  await registriereUndMelde(page)
+  await registerAndSignIn(page)
 
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
 
@@ -39,12 +39,12 @@ test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
   // Nach dem Anlegen landet man im Notebook, nicht wieder in der Liste.
   await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Quartalsanalyse Q3')
-  // Auf den Absatz eingegrenzt: derselbe Text steht weiter unten noch einmal
-  // als Vorbelegung im Einstellungsformular, und ein ungebundenes getByText
-  // fände beide.
-  await expect(
-    page.locator('main > p').filter({ hasText: 'Umsatz, Marge, Ausblick' })
-  ).toBeVisible()
+  // Über die zugängliche Beschreibung der Überschrift statt über einen
+  // CSS-Pfad: derselbe Text steht weiter unten noch einmal als Vorbelegung im
+  // Formular, und `main > p` hätte den Test an die Elementhierarchie gebunden.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleDescription(
+    'Umsatz, Marge, Ausblick'
+  )
   await expect(page.getByLabel(/Beschreibung/)).toHaveValue('Umsatz, Marge, Ausblick')
 
   await page.getByRole('link', { name: /Zurück zur Übersicht/ }).click()
@@ -52,7 +52,7 @@ test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
 })
 
 test('ein Titel aus Leerzeichen wird abgelehnt', async ({ page }) => {
-  await registriereUndMelde(page)
+  await registerAndSignIn(page)
   await page.goto('/app/neu')
 
   // Das required-Attribut fängt ein leeres Feld ab, aber nicht drei
@@ -65,7 +65,7 @@ test('ein Titel aus Leerzeichen wird abgelehnt', async ({ page }) => {
 })
 
 test('Umbenennen wirkt sofort in Titel und Übersicht', async ({ page }) => {
-  await registriereUndMelde(page)
+  await registerAndSignIn(page)
   await page.goto('/app/neu')
   await page.getByLabel('Titel').fill('Erster Name')
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
@@ -84,7 +84,7 @@ test('Umbenennen wirkt sofort in Titel und Übersicht', async ({ page }) => {
 })
 
 test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
-  await registriereUndMelde(page)
+  await registerAndSignIn(page)
   await page.goto('/app/neu')
   await page.getByLabel('Titel').fill('Wegwerf')
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
@@ -92,12 +92,12 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
   // Der gefährliche Knopf liegt hinter einer Aufklappung und ist vorher nicht
   // erreichbar. Ohne diese Zusicherung wäre die Bestätigung nur Dekoration.
-  const löschen = page.getByRole('button', { name: /endgültig löschen/ })
-  await expect(löschen).toBeHidden()
+  const deleteButton = page.getByRole('button', { name: /endgültig löschen/ })
+  await expect(deleteButton).toBeHidden()
 
   await page.getByText('Ja, ich möchte löschen').click()
-  await expect(löschen).toBeVisible()
-  await löschen.click()
+  await expect(deleteButton).toBeVisible()
+  await deleteButton.click()
 
   await expect(page).toHaveURL(/\/app$/)
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
@@ -105,24 +105,24 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
 test('ein fremdes Notebook ergibt 404, nicht 403', async ({ page, browser }) => {
   // Alice legt eines an.
-  await registriereUndMelde(page)
+  await registerAndSignIn(page)
   await page.goto('/app/neu')
   await page.getByLabel('Titel').fill('Alices Notebook')
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
   await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
-  const fremdeUrl = page.url()
+  const foreignUrl = page.url()
 
   // Mallory ruft die URL direkt auf.
-  const kontext = await browser.newContext()
-  const malloryPage = await kontext.newPage()
-  await registriereUndMelde(malloryPage)
+  const context = await browser.newContext()
+  const malloryPage = await context.newPage()
+  await registerAndSignIn(malloryPage)
 
-  const antwort = await malloryPage.goto(fremdeUrl)
+  const response = await malloryPage.goto(foreignUrl)
 
   // 404 und nicht 403: ein 403 würde bestätigen, dass es dieses Notebook gibt,
   // und damit genau das preisgeben, was RLS gerade verborgen hat.
-  expect(antwort?.status()).toBe(404)
+  expect(response?.status()).toBe(404)
   await expect(malloryPage.getByText('Alices Notebook')).toBeHidden()
 
-  await kontext.close()
+  await context.close()
 })

@@ -161,7 +161,7 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
   Damit das auch als HTTP-Status ankommt, darf **keine `loading.tsx` über einer Route liegen,
   die `notFound()` aufrufen kann**. Eine `loading.tsx` erzeugt eine Suspense-Grenze für ihren
   ganzen Teilbaum; Next schickt die Hülle sofort los und legt den Status damit auf 200 fest, und
-  ein späteres `notFound()` kann ihn nicht mehr ändern. Die Seite zeigt dann „nicht gefunden"
+  ein späteres `notFound()` kann ihn nicht mehr ändern. Die Seite zeigt dann „nicht gefunden“
   und antwortet mit 200. Nachgemessen: ohne die Datei 404, mit ihr 200, bei identischem Code.
   Deshalb liegt der Ladezustand der Übersicht in der Route-Gruppe `(uebersicht)` und nicht eine
   Ebene höher.

@@ -32,12 +32,18 @@
   --brand-700: #7fb0ff;
 
   --accent: #faef70; /* Gold. Nur an drei Stellen erlaubt, siehe CLAUDE.md. */
+
+  /* Vordergrund auf --brand-600. Kein festes Weiß: im dunklen Theme ist
+     brand-600 mit #5B8DEF so hell, dass Weiß darauf nur 3.23:1 erreicht und
+     AA verfehlt. Dunkle Tinte darauf ergibt 5.68:1. Im hellen Theme ist es
+     umgekehrt. Nachgemessen, siehe src/lib/__tests__/contrast.test.ts. */
+  --on-brand: #0e1424;
   --accent-soft: #2a2a18;
   --accent-ink: #faef70;
 
   --ink: #edf1f7;
   --muted-ink: #a8b0be;
-  --faint-ink: #79839a;
+  --faint-ink: #848fa8; /* 4.63:1 auf --surface — kleine Hilfstexte brauchen AA */
 
   --surface: #1b2640;
   --surface-2: #16203a;
@@ -69,22 +75,23 @@
 
   --accent: #faef70;
   --accent-soft: #fefde8;
-  --accent-ink: #8a8030;
+  --on-brand: #ffffff;
+  --accent-ink: #7e752c; /* 4.57:1 auf --accent-soft */
 
   --ink: #0e1424;
   --muted-ink: #5a6472;
-  --faint-ink: #8a93a3;
+  --faint-ink: #707784; /* 4.51:1 auf --surface */
 
   --surface: #ffffff;
   --surface-2: #f2f5f9;
   --canvas: #f7f4ee;
   --hairline: #e4e9f2;
 
-  --ok: #16a34a;
+  --ok: #11803a; /* 5.03:1 auf --surface, 4.51:1 auf --ok-soft */
   --ok-soft: #e7f6ee;
-  --warn: #b45309;
+  --warn: #b05109; /* 5.21:1 auf --surface, 4.59:1 auf --warn-soft */
   --warn-soft: #fbeee6;
-  --err: #dc2626;
+  --err: #d32424; /* 5.19:1 auf --surface, 4.55:1 auf --err-soft */
   --err-soft: #feecec;
 
   --cite-bg: #eef3ff;
@@ -103,6 +110,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+  --color-on-brand: var(--on-brand);
 
   --color-ink: var(--ink);
   --color-muted-ink: var(--muted-ink);

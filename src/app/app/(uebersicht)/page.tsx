@@ -1,3 +1,15 @@
+/**
+ * Übersicht aller Notebooks des angemeldeten Nutzers.
+ *
+ * Liegt in der Route-Gruppe `(uebersicht)`, damit die `loading.tsx` daneben
+ * nur diese Seite umspannt und nicht `/app/[notebookId]` — dort würde die
+ * Suspense-Grenze den 404 in einen 200 verwandeln. Die Gruppe ändert die URL
+ * nicht; die Seite bleibt `/app`.
+ *
+ * Die Abfrage filtert bewusst NICHT nach `owner_id`: das erledigt die
+ * RLS-Policy. Ein fremdes Notebook kann hier nicht auftauchen, selbst wenn
+ * diese Datei falsch wäre.
+ */
 import type { Metadata } from 'next'
 import Link from 'next/link'
 

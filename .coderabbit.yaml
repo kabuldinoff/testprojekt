@@ -44,9 +44,14 @@ reviews:
         test next to it in __tests__/. Components and route handlers are orchestration only —
         flag business logic that has drifted into them.
 
-        Components must use semantic Tailwind utilities (bg-surface, text-ink, border-hairline)
-        exclusively. Flag any hex colour and any dark: prefix; the only permitted exception is
-        the .only-dark / .only-light pair used by the theme toggle.
+        Components must only use colour utilities backed by a design token from
+        src/app/globals.css — that includes bg-surface, text-ink, border-hairline, and equally
+        bg-brand-600, text-on-brand, border-brand-600, text-accent-ink and the status colours.
+        All of these are redefined per theme, so they are theme-safe by construction.
+
+        What to flag instead: a raw hex value, a Tailwind palette colour that is NOT a project
+        token (text-white, bg-slate-800, border-gray-200), and any dark: prefix. The only
+        permitted exception is the .only-dark / .only-light pair used by the theme toggle.
 
         Comments must explain why, never what. Flag comments that restate the code. Flag any
         non-obvious numeric literal that is not a named constant with a stated reason.

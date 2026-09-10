@@ -1,3 +1,13 @@
+/**
+ * Hält die Eingaberegeln mit der Datenbank im Gleichschritt.
+ *
+ * Die Grenzen in `schema.ts` spiegeln CHECK-Constraints auf `notebooks`. Läuft
+ * eines von beiden weg, äußert sich das nicht als Validierungsfehler, sondern
+ * als abgelehnte Zeile aus Postgres — mit einer Meldung, die kein Nutzer
+ * versteht. Der interessanteste Fall ist die Emoji-Länge: Postgres zählt Code
+ * Points, JavaScript zählt UTF-16-Einheiten, und bei Emoji gehen die
+ * auseinander.
+ */
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -70,8 +80,13 @@ describe('parseNotebookForm', () => {
   })
 
   it('zählt Code Points wie Postgres, nicht UTF-16-Einheiten', () => {
-    // Neun einfache Emoji sind neun Code Points — eines zu viel.
-    expect(parseNotebookForm(form({ title: 'ok', emoji: '📊'.repeat(9) })).success).toBe(false)
-    expect(parseNotebookForm(form({ title: 'ok', emoji: '📊'.repeat(8) })).success).toBe(true)
+    // Aus der Konstante abgeleitet, nicht abgeschrieben: sonst prüft der Test
+    // nach einer Änderung von EMOJI_MAX weiter die alte Grenze.
+    expect(
+      parseNotebookForm(form({ title: 'ok', emoji: '📊'.repeat(EMOJI_MAX + 1) })).success
+    ).toBe(false)
+    expect(parseNotebookForm(form({ title: 'ok', emoji: '📊'.repeat(EMOJI_MAX) })).success).toBe(
+      true
+    )
   })
 })

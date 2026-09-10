@@ -35,15 +35,15 @@ describe('safeReturnPath', () => {
 
   it('das geblockte Ziel löst nie auf eine fremde Herkunft auf', () => {
     // Die eigentliche Zusicherung, unabhängig von der Implementierung.
-    const angriffe = [
+    const attacks = [
       '//evil.example',
       '/\\evil.example',
       'https://evil.example',
       '\\\\evil.example'
     ]
-    for (const angriff of angriffe) {
-      const ziel = new URL(safeReturnPath(angriff), 'https://notabene.test')
-      expect(ziel.origin, `${angriff} entkam`).toBe('https://notabene.test')
+    for (const attack of attacks) {
+      const target = new URL(safeReturnPath(attack), 'https://notabene.test')
+      expect(target.origin, `${attack} entkam`).toBe('https://notabene.test')
     }
   })
 })

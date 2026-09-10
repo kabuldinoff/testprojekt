@@ -60,12 +60,12 @@ test('die Wahl überlebt einen Reload', async ({ page }) => {
 test('die selbst gehostete Schrift wird tatsächlich geladen', async ({ page }) => {
   await page.goto('/')
 
-  const schrift = await page.getByRole('heading', { level: 1 }).evaluate(async (el) => {
+  const fontState = await page.getByRole('heading', { level: 1 }).evaluate(async (el) => {
     // Erst abwarten, bis der Browser mit dem Laden aller Schriften fertig ist.
     // Ohne das prüft man einen Zwischenstand.
     await document.fonts.ready
 
-    const erste = getComputedStyle(el)
+    const firstFamily = getComputedStyle(el)
       .fontFamily.split(',')[0]!
       .trim()
       .replace(/^["']|["']$/g, '')
@@ -81,17 +81,17 @@ test('die selbst gehostete Schrift wird tatsächlich geladen', async ({ page }) 
       status: f.status
     }))
 
-    return { erste, faces }
+    return { firstFamily, faces }
   })
 
   // Die Überschrift muss mit unserer Schrift gesetzt sein, nicht mit einer
   // System-Schrift aus dem Fallback-Stack.
-  expect(schrift.erste).toBe('Plus Jakarta Sans')
+  expect(fontState.firstFamily).toBe('Plus Jakarta Sans')
 
-  const passend = schrift.faces.filter((f) => f.family === schrift.erste)
+  const matching = fontState.faces.filter((f) => f.family === fontState.firstFamily)
   expect(
-    passend.length,
-    `Keine @font-face-Deklaration für "${schrift.erste}". Vorhanden: ${JSON.stringify(schrift.faces)}`
+    matching.length,
+    `Keine @font-face-Deklaration für "${fontState.firstFamily}". Vorhanden: ${JSON.stringify(fontState.faces)}`
   ).toBeGreaterThan(0)
 
   // Mindestens eine, nicht alle: next/font deklariert mehrere Schnitte, und
@@ -99,7 +99,7 @@ test('die selbst gehostete Schrift wird tatsächlich geladen', async ({ page }) 
   // werden. Die übrigen stehen dauerhaft auf "unloaded" — das ist kein Fehler,
   // sondern der Sinn der Sache.
   expect(
-    passend.some((f) => f.status === 'loaded'),
-    `Kein Schnitt von "${schrift.erste}" geladen: ${JSON.stringify(passend)}`
+    matching.some((f) => f.status === 'loaded'),
+    `Kein Schnitt von "${fontState.firstFamily}" geladen: ${JSON.stringify(matching)}`
   ).toBe(true)
 })
