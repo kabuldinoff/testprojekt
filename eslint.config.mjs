@@ -32,6 +32,12 @@ export default defineConfig([
     'test-results/**',
     'next-env.d.ts',
     // Standalone-HTML ohne Build-Schritt — kein ESLint-Ziel.
-    'design/**'
+    'design/**',
+    // Von `supabase start` erzeugt (u. a. der Edge-Runtime-Bootstrap, eine
+    // einzige 31.000 Zeichen lange Zeile). Git ignoriert das über
+    // supabase/.gitignore; ESLint liest verschachtelte .gitignore-Dateien
+    // nicht, deshalb hier noch einmal ausdrücklich.
+    'supabase/.temp/**',
+    'supabase/.branches/**'
   ])
 ])
