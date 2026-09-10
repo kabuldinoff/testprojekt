@@ -39,25 +39,43 @@ const SIZES: Record<Size, string> = {
   compact: 'px-3 py-1.5 text-sm'
 }
 
+/**
+ * Die Klassen ohne das Element.
+ *
+ * Ein Link, der wie ein Knopf aussieht, muss ein `<a>` bleiben: er navigiert,
+ * also gehört ihm die Link-Rolle, das Öffnen im neuen Tab und die
+ * Adressanzeige beim Überfahren. Ein `<button>` mit `onClick={router.push}`
+ * nimmt dem Nutzer all das weg.
+ *
+ * Die Alternative wäre `asChild` über Radix Slot. Das wäre eine Abhängigkeit
+ * für etwas, das eine exportierte Funktion genauso löst.
+ */
+export function buttonClasses({
+  variant = 'primary',
+  size = 'default',
+  className
+  // `| undefined` ausdrücklich, nicht nur `?`. Mit exactOptionalPropertyTypes
+  // sind das zwei verschiedene Dinge: `?` heißt "darf fehlen", nicht "darf
+  // undefined sein". Der Aufruf aus <Button> reicht className durch, und das
+  // ist dort legitim undefined.
+}: { variant?: Variant; size?: Size; className?: string | undefined } = {}) {
+  return cn(
+    'inline-flex items-center justify-center gap-2 rounded-control border',
+    'leading-tight font-bold transition-colors',
+    // Ein deaktivierter Knopf muss als deaktiviert erkennbar sein, nicht
+    // nur als nicht reagierend — sonst hält der Nutzer die Seite für kaputt.
+    'disabled:cursor-not-allowed disabled:opacity-45',
+    SIZES[size],
+    VARIANTS[variant],
+    className
+  )
+}
+
 export function Button({
   variant = 'primary',
   size = 'default',
   className,
   ...props
 }: ComponentProps<'button'> & { variant?: Variant; size?: Size }) {
-  return (
-    <button
-      {...props}
-      className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-control border',
-        'leading-tight font-bold transition-colors',
-        // Ein deaktivierter Knopf muss als deaktiviert erkennbar sein, nicht
-        // nur als nicht reagierend — sonst hält der Nutzer die Seite für kaputt.
-        'disabled:cursor-not-allowed disabled:opacity-45',
-        SIZES[size],
-        VARIANTS[variant],
-        className
-      )}
-    />
-  )
+  return <button {...props} className={buttonClasses({ variant, size, className })} />
 }
