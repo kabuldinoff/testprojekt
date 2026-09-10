@@ -53,7 +53,20 @@ jobs:
       - if: steps.pw-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
+      # Die Suite legt Konten an und schreibt in die Datenbank. Sie läuft
+      # deshalb ausschließlich gegen einen frischen lokalen Stack, nie gegen
+      # das echte Projekt — scripts/e2e.mjs liest die Zugangsdaten aus
+      # `supabase status` und bricht ab, wenn nichts läuft. Damit kann sie gar
+      # nicht versehentlich Produktionsdaten anfassen.
+      - name: Supabase-Stack starten
+        run: pnpm supabase start
+
       - run: pnpm test:e2e
+
+      - name: Supabase-Stack stoppen
+        if: always()
+        run: pnpm supabase stop
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
