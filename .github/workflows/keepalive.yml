@@ -26,10 +26,10 @@ jobs:
       - name: Datenbank anstupsen
         env:
           URL: ${{ secrets.SUPABASE_URL }}
-          KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           if [ -z "$URL" ] || [ -z "$KEY" ]; then
-            echo "::warning::SUPABASE_URL oder SUPABASE_ANON_KEY fehlt — übersprungen."
+            echo "::warning::SUPABASE_URL oder SUPABASE_PUBLISHABLE_KEY fehlt — übersprungen."
             exit 0
           fi
           # heartbeat ist eine winzige Tabelle, die nur zu diesem Zweck existiert.

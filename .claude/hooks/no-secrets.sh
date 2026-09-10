@@ -52,18 +52,34 @@ leaked=$(printf '%s\n' "$candidates" | grep -E '^_intern/' || true)
 $leaked
 "
 
-# 2. Key-Muster im tatsächlichen Inhalt. Nur echte Formate, damit der Hook nicht
-#    bei jeder Erwähnung des Wortes anschlägt und dadurch unglaubwürdig wird.
+# 2. Key-Muster im tatsächlichen Inhalt.
 content=$(git diff HEAD 2>/dev/null || true)
 for f in $untracked; do
   [ -f "$f" ] && [ "$(wc -c <"$f")" -lt 2000000 ] && content="$content
 $(cat "$f" 2>/dev/null || true)"
 done
 
-keys=$(printf '%s' "$content" \
-  | grep -nE 'AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9]{32,}|eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}' \
+# 2a. Bekannte Präfixe. Treffsicher, aber jeder neue Anbieter bringt ein neues
+#     Format mit — genau daran ist dieser Hook schon einmal vorbeigelaufen, als
+#     Supabase von JWT-Keys auf sb_secret_ umstellte.
+prefixed=$(printf '%s' "$content" \
+  | grep -nE 'sb_secret_[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9]{32,}|eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}' \
   | head -5 || true)
-[ -n "$keys" ] && findings="${findings}Etwas mit der Form eines API-Keys oder JWT:
+
+# 2b. Die allgemeine Regel, die auch Formate erwischt, die es heute noch nicht
+#     gibt: eine Zuweisung an einen Namen, der nach Geheimnis klingt, mit einem
+#     Wert, der lang genug ist, um einer zu sein. Deckt Mistral (32 Zeichen ohne
+#     Präfix) und alles Künftige ab.
+#     Ausgenommen: Zeilen mit leerem Wert (.env.example) und offensichtliche
+#     Platzhalter, sonst schlägt der Hook bei der eigenen Vorlage an und wird
+#     unglaubwürdig.
+assigned=$(printf '%s' "$content" \
+  | grep -nE '(API_KEY|SECRET_KEY|SERVICE_ROLE_KEY|ACCESS_TOKEN|_SECRET|_TOKEN|_PASSWORD)[[:space:]]*=[[:space:]]*.{16,}' \
+  | grep -viE '=[[:space:]]*(\$|<|\{|"?(dein|your|xxx|placeholder|beispiel|example|changeme|todo))' \
+  | head -5 || true)
+
+keys=$(printf '%s\n%s\n' "$prefixed" "$assigned" | sed '/^$/d' | sort -u | head -6)
+[ -n "$keys" ] && findings="${findings}Etwas mit der Form eines Schlüssels oder Geheimnisses:
 $(printf '%s' "$keys" | cut -c1-120)
 "
 
