@@ -1,0 +1,184 @@
+@import 'tailwindcss';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN-TOKENS
+   Verbindliche Referenz ist design/canvas.html. Die Werte dort sind nicht
+   geschätzt, sondern per getComputedStyle aus den Referenzseiten gelesen;
+   design/README.md hält fest, welcher Wert woher stammt.
+
+   Zwei Ebenen, und die Trennung ist der ganze Trick:
+   1. Semantische Variablen (--canvas, --ink, …) — hier unten pro Theme gesetzt.
+   2. @theme inline mappt --color-* darauf. "inline" heißt: die generierten
+      Utilities referenzieren die Variable, statt ihren Wert einzubacken.
+      Nur deshalb schaltet `bg-canvas` beim Theme-Wechsel überhaupt um.
+
+   Daraus folgt die Regel aus CLAUDE.md: Komponenten benutzen ausschließlich
+   semantische Utilities (bg-surface, text-ink, …), niemals einen Hex-Wert und
+   keinen einzigen dark:-Prefix. Ohne diese Regel zerfällt Dark Mode in
+   dreihundert Einzelfälle.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── DARK — der Default. Muss VOR .light stehen. ────────────────────────────
+   :root, .dark und .light haben alle die Spezifität 0,1,0; bei Gleichstand
+   gewinnt die spätere Regel. Stünde der :root-Block hinten, überstimmte er
+   jedes .light — der Umschalter täte sichtbar nichts, ohne Fehlermeldung und
+   ohne dass irgendein Test rot wird. Genau das ist im Canvas schon passiert. */
+:root,
+.dark {
+  --brand-50: #22304f; /* muss heller als --surface sein, sonst verschwinden
+                          Tint-Flächen und Zitat-Chips in der Karte */
+  --brand-100: #2e4272;
+  --brand-600: #5b8def;
+  --brand-700: #7fb0ff;
+
+  --accent: #faef70; /* Gold. Nur an drei Stellen erlaubt, siehe CLAUDE.md. */
+  --accent-soft: #2a2a18;
+  --accent-ink: #faef70;
+
+  --ink: #edf1f7;
+  --muted-ink: #a8b0be;
+  --faint-ink: #79839a;
+
+  --surface: #1b2640;
+  --surface-2: #16203a;
+  --canvas: #0e1424;
+  --hairline: #2a3550;
+
+  --ok: #4ade80;
+  --ok-soft: #14301f;
+  --warn: #fbbf24;
+  --warn-soft: #33270b;
+  --err: #f87171;
+  --err-soft: #3a1618;
+
+  /* Der Zitat-Chip sitzt als einziges Element sowohl auf einer Karte als auch
+     mitten im Fließtext und braucht deshalb eigene Werte statt brand-*. */
+  --cite-bg: #23345c;
+  --cite-fg: #a6c6ff;
+  --cite-border: #38508a;
+
+  --glow: radial-gradient(700px 380px at 50% -6%, rgb(37 99 235 / 0.45), transparent 60%);
+}
+
+/* ── LIGHT — überschreibt den Default ────────────────────────────────────── */
+.light {
+  --brand-50: #eef3ff;
+  --brand-100: #dbe7ff;
+  --brand-600: #2563eb;
+  --brand-700: #1d4ed8;
+
+  --accent: #faef70;
+  --accent-soft: #fefde8;
+  --accent-ink: #8a8030;
+
+  --ink: #0e1424;
+  --muted-ink: #5a6472;
+  --faint-ink: #8a93a3;
+
+  --surface: #ffffff;
+  --surface-2: #f2f5f9;
+  --canvas: #f7f4ee;
+  --hairline: #e4e9f2;
+
+  --ok: #16a34a;
+  --ok-soft: #e7f6ee;
+  --warn: #b45309;
+  --warn-soft: #fbeee6;
+  --err: #dc2626;
+  --err-soft: #feecec;
+
+  --cite-bg: #eef3ff;
+  --cite-fg: #1d4ed8;
+  --cite-border: #c7d9ff;
+
+  --glow: radial-gradient(60% 70% at 50% 30%, rgb(37 99 235 / 0.08), transparent 70%);
+}
+
+@theme inline {
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-ink: var(--ink);
+  --color-muted-ink: var(--muted-ink);
+  --color-faint-ink: var(--faint-ink);
+
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-canvas: var(--canvas);
+  --color-hairline: var(--hairline);
+
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-err: var(--err);
+  --color-err-soft: var(--err-soft);
+
+  --color-cite-bg: var(--cite-bg);
+  --color-cite-fg: var(--cite-fg);
+  --color-cite-border: var(--cite-border);
+
+  /* Radien von der Referenzseite: Karte 16, Control 12, Pill rund. */
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-pill: 999px;
+
+  /* Von next/font gesetzt, siehe src/app/layout.tsx. */
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-lora), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  html {
+    /* Verhindert, dass der Browser im Dark Mode weiße Scrollbars und
+       Formular-Defaults zeichnet. */
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ein sichtbarer Fokusring ist keine Kür. Ohne ihn ist die App per Tastatur
+     unbedienbar und Lighthouse-Accessibility fällt durch. */
+  :focus-visible {
+    outline: 2px solid var(--brand-600);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /* Die einzige Stelle im Projekt, die auf die Theme-Klasse zugreift.
+     Sie erlaubt dem Theme-Umschalter, beide Symbole zu rendern und CSS
+     entscheiden zu lassen — damit ist sein Markup auf Server und Client
+     identisch und es braucht weder State noch Effect. Überall sonst gilt
+     weiterhin: nur semantische Tokens, kein Theme-Wissen in Komponenten. */
+  .only-dark,
+  .only-light {
+    display: none;
+  }
+
+  .dark .only-dark,
+  .light .only-light {
+    display: inline;
+  }
+}

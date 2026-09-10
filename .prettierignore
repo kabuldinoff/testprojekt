@@ -1,0 +1,10 @@
+# Der Design-Canvas ist handgesetztes HTML mit bewusster Formatierung
+# (Artboards und Kommentarblöcke). Prettier würde ihn unlesbar umbrechen.
+design/canvas.html
+
+.next
+node_modules
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml

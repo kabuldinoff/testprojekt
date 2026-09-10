@@ -1,0 +1,82 @@
+# CodeRabbit — Konfiguration des automatischen Reviewers.
+#
+# Bewusst im Repo und nicht nur in der Weboberfläche: die Einstellung eines
+# Werkzeugs, das über Code urteilt, gehört neben den Code und in die Historie.
+#
+# CodeRabbit liest diese Datei vom Default-Branch. Änderungen wirken deshalb
+# erst, nachdem sie auf main gemergt sind.
+language: en-US
+
+reviews:
+  # Standard ist "chill" — meldet nur das Auffälligste. Hier ist mehr Strenge
+  # ausdrücklich erwünscht: das Repo wird in einem Gespräch durchgegangen, und
+  # ein Befund, den ich mit Begründung abgelehnt habe, ist dort mehr wert als
+  # ein Diff ohne Diskussion.
+  profile: assertive
+
+  high_level_summary: true
+  review_status: true
+
+  # Kein generiertes Gedicht unter jedem Review.
+  poem: false
+
+  # Der Reviewer kommentiert, er blockiert nicht. Ob ein Befund zutrifft,
+  # entscheidet ein Mensch — dafür ist er da.
+  request_changes_workflow: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  path_filters:
+    # Generiert, riesig, ohne Erkenntniswert im Review.
+    - '!pnpm-lock.yaml'
+    # Handgesetztes Standalone-HTML mit bewusster Formatierung. Es ist ein
+    # Design-Dokument, kein Anwendungscode.
+    - '!design/canvas.html'
+
+  # Projektregeln, gegen die geprüft werden soll. Sie stehen ausführlich in
+  # CLAUDE.md; hier die, die sich beim Lesen eines Diffs überhaupt prüfen lassen.
+  path_instructions:
+    - path: 'src/**/*.{ts,tsx}'
+      instructions: >-
+        Anything decidable without I/O must live in src/lib/ as a pure function with a unit
+        test next to it in __tests__/. Components and route handlers are orchestration only —
+        flag business logic that has drifted into them.
+
+        Components must use semantic Tailwind utilities (bg-surface, text-ink, border-hairline)
+        exclusively. Flag any hex colour and any dark: prefix; the only permitted exception is
+        the .only-dark / .only-light pair used by the theme toggle.
+
+        Comments must explain why, never what. Flag comments that restate the code. Flag any
+        non-obvious numeric literal that is not a named constant with a stated reason.
+
+        Every UI state must be designed: empty, loading and failed. Flag an error path that
+        offers no action or says only that something went wrong.
+
+        Missing access must return 404, never 403 — a 403 confirms the resource exists.
+
+        The service_role Supabase client may only be reached from the ingestion worker, never
+        from a route that answers a user action directly.
+
+    - path: 'supabase/migrations/**'
+      instructions: >-
+        Every policy and every index needs a comment above it stating the reason — these
+        migrations are read aloud in a review conversation.
+
+        Check each new table for: RLS enabled; policies for all four operations (a missing
+        UPDATE policy fails silently as a discarded write); (select auth.uid()) rather than
+        auth.uid(), which turns per-row evaluation into a single initplan; an explicit
+        "to authenticated" role; and an index on the column the policy filters on.
+
+        Functions exposed through PostgREST must be SECURITY INVOKER. SECURITY DEFINER is only
+        acceptable for small helpers that return no data and set an explicit search_path.
+
+    - path: 'e2e/**'
+      instructions: >-
+        End-to-end tests must assert the user-visible promise of a slice, not implementation
+        details. Prefer role-based locators over CSS selectors. Flag a test that would still
+        pass if the feature were broken.
+
+chat:
+  auto_reply: true

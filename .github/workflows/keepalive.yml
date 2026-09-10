@@ -1,0 +1,51 @@
+name: Keepalive
+
+# Supabase pausiert ein Projekt im kostenlosen Tarif nach etwa einer Woche ohne
+# Datenbankaktivität. Dieser Lauf hält es wach, damit der Live-Link jederzeit
+# funktioniert, ohne dass jemand ihn vorher aufwecken muss.
+#
+# Zwei Netze, absichtlich unabhängig voneinander:
+#   1. pg_cron in der Datenbank selbst (siehe supabase/migrations/) — braucht
+#      keinen externen Dienst und kann von niemandem abgeschaltet werden.
+#   2. Dieser Workflow — ein echter externer HTTP-Request, und damit
+#      unzweifelhaft "user database activity" im Sinne von Supabase.
+#
+# ⚠️ GitHub deaktiviert geplante Workflows in ÖFFENTLICHEN Repositories nach
+# 60 Tagen ohne Repo-Aktivität. Wenn dieser Lauf still verschwindet, ist das der
+# Grund — im Actions-Tab wieder einschalten.
+
+on:
+  schedule:
+    - cron: '17 4 */2 * *' # alle zwei Tage; 17 nach, um die volle Stunde zu meiden
+  workflow_dispatch:
+
+# Dieser Lauf schickt genau einen HTTP-Request. Er braucht kein Token mit
+# Schreibrechten auf das Repository.
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    # Ein Request, der eine Minute nicht schafft, schafft es auch in sechs
+    # Stunden nicht — und so lange liefe der Job ohne diese Grenze.
+    timeout-minutes: 5
+    steps:
+      - name: Datenbank anstupsen
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::warning::SUPABASE_URL oder SUPABASE_PUBLISHABLE_KEY fehlt — übersprungen."
+            exit 0
+          fi
+          # heartbeat ist eine winzige Tabelle, die nur zu diesem Zweck existiert.
+          # Beide Zeitgrenzen sind nötig: --connect-timeout deckt den Fall ab,
+          # dass die Gegenstelle nicht antwortet, --max-time den, dass sie die
+          # Verbindung annimmt und dann hängen lässt.
+          code=$(curl -sS --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/heartbeat?select=at&limit=1")
+          echo "HTTP $code"
+          [ "$code" = "200" ] || exit 1
