@@ -15,6 +15,7 @@ jobs:
   verify:
     name: Lint, Typen, Unit-Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -28,6 +29,9 @@ jobs:
   e2e:
     name: End-to-End
     runs-on: ubuntu-latest
+    # Der Lauf dauert normal wenige Minuten. Ohne Obergrenze belegt ein
+    # hängender Container den Runner bis zum GitHub-Standard von sechs Stunden.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -58,8 +62,15 @@ jobs:
       # das echte Projekt — scripts/e2e.mjs liest die Zugangsdaten aus
       # `supabase status` und bricht ab, wenn nichts läuft. Damit kann sie gar
       # nicht versehentlich Produktionsdaten anfassen.
+      # Nur die Dienste, die die Tests wirklich brauchen: Postgres, GoTrue,
+      # PostgREST und Kong. Der volle Stack zieht zusätzlich Studio, Realtime,
+      # imgproxy, edge-runtime und die Analytics-Kette (vector + logflare) —
+      # zusammen einige Gigabyte, und ein erster Lauf blieb damit über zwanzig
+      # Minuten hängen, ohne je fertig zu werden.
       - name: Supabase-Stack starten
-        run: pnpm supabase start
+        run: >-
+          pnpm exec supabase start
+          -x studio,realtime,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
 
       - run: pnpm test:e2e
 

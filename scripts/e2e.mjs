@@ -31,7 +31,9 @@ function localStackEnv() {
       '\nDer lokale Supabase-Stack läuft nicht.\n' +
         'Erst starten:  pnpm supabase:start\n' +
         '(Braucht Docker. Die Ports liegen auf 5442x, damit sie sich nicht mit\n' +
-        ' einem anderen lokalen Supabase-Projekt beißen.)\n'
+        ' einem anderen lokalen Supabase-Projekt beißen. CI startet denselben\n' +
+        ' Stack, aber ohne Studio, Realtime und die Analytics-Kette — lokal sind\n' +
+        ' die zum Debuggen nützlich, im Runner kosten sie nur Minuten.)\n'
     )
     process.exit(1)
   }
