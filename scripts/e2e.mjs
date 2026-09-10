@@ -23,7 +23,9 @@
  * zeigt, und genau das ist die Zusicherung dieses Produkts. Die Schlüssel
  * hier sind Platzhalter; der Stub sieht sie nie an.
  */
-import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+
+import { localStackEnv } from './lib/local-stack.mjs'
 
 /**
  * Fester Port, weil er in drei Prozesse muss: Stub, Build und Server. Er
@@ -33,47 +35,13 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 const STUB_PORT = 54430
 const STUB_URL = `http://127.0.0.1:${STUB_PORT}`
 
-function localStackEnv() {
-  let raw
-  try {
-    raw = execFileSync('pnpm', ['exec', 'supabase', 'status', '-o', 'env'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-  } catch {
-    console.error(
-      '\nDer lokale Supabase-Stack läuft nicht.\n' +
-        'Erst starten:  pnpm supabase:start\n' +
-        '(Braucht Docker. Die Ports liegen auf 5442x, damit sie sich nicht mit\n' +
-        ' einem anderen lokalen Supabase-Projekt beißen. CI startet denselben\n' +
-        ' Stack, aber ohne Studio, Realtime und die Analytics-Kette — lokal sind\n' +
-        ' die zum Debuggen nützlich, im Runner kosten sie nur Minuten.)\n'
-    )
-    process.exit(1)
-  }
-
-  const values = Object.fromEntries(
-    raw
-      .split('\n')
-      .map((line) => line.match(/^([A-Z0-9_]+)="?([^"]*)"?$/))
-      .filter((m) => m !== null)
-      .map((m) => [m[1], m[2]])
-  )
-
-  for (const key of ['API_URL', 'PUBLISHABLE_KEY', 'SECRET_KEY']) {
-    if (!values[key]) {
-      console.error(`\n\`supabase status\` liefert kein ${key}. Stack neu starten.\n`)
-      process.exit(1)
-    }
-  }
-
+function testEnv() {
+  const stack = localStackEnv()
   return {
     ...process.env,
-    NEXT_PUBLIC_SUPABASE_URL: values.API_URL,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: values.PUBLISHABLE_KEY,
-    SUPABASE_SECRET_KEY: values.SECRET_KEY,
+    ...stack,
     // Die Tests brauchen den Postfach-Server, um Bestätigungslinks zu lesen.
-    E2E_MAILPIT_URL: values.MAILPIT_URL ?? 'http://127.0.0.1:54424',
+    E2E_MAILPIT_URL: stack.MAILPIT_URL,
 
     // Platzhalter: `aiEnv()` verlangt sie, der Stub prüft sie nicht. Sie
     // stehen bewusst hier und nicht in einer Datei — ein Wert, der aussieht
@@ -88,7 +56,7 @@ function localStackEnv() {
   }
 }
 
-const env = localStackEnv()
+const env = testEnv()
 
 // Der Stub läuft neben Build und Tests. `unref()` wäre falsch — er soll leben,
 // solange dieser Prozess lebt, und mit ihm sterben.

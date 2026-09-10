@@ -9,6 +9,7 @@
   "packageManager": "pnpm@10.18.2",
   "scripts": {
     "dev": "next dev",
+    "dev:local": "node scripts/dev-local.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
