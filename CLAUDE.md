@@ -56,6 +56,8 @@ Datei hier ergänzt die Projektregeln.
   entstanden vor der ersten Komponente. Bewusst **nicht** gitignoriert.
 - **`docs/adr/`** — jede Entscheidung, die jemand hinterfragen könnte, mit Kontext, Alternativen
   und Konsequenzen. Eine bewusste Nicht-Entscheidung gehört genauso hinein.
+- **`docs/security.md`** — was geschützt wird, wodurch, und was bewusst offen bleibt. Eine Seite,
+  mit den Restlücken darin statt daneben.
 - **`docs/deployment.md`** — wie Code und Schema in Produktion kommen, und warum auf
   **verschiedenen Wegen**: Vercel baut automatisch aus `main`, das Schema geht ausschließlich
   von Hand per `supabase db push` raus. Die Supabase-GitHub-Integration ist bewusst nicht
@@ -167,9 +169,15 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
   Ebene höher.
 
 - **Nie stumm scheitern.** Fehler werden als `status='failed'` samt `error_message` persistiert.
-- Beim URL-Import holt der Server eine vom Nutzer angegebene Adresse: `localhost`, `127.0.0.0/8`,
-  `169.254.169.254`, private Netze und Nicht-HTTP(S)-Schemata werden **vor** dem Abruf abgelehnt,
-  die Antwortgröße gedeckelt.
+- Beim URL-Import holt der Server eine vom Nutzer angegebene Adresse. Geprüft wird zweistufig:
+  syntaktisch in `src/lib/sources/url-safety.ts` (rein, getestet) **und** nach der Auflösung des
+  Hostnamens gegen die tatsächlichen IP-Adressen — ein Name darf auf `127.0.0.1` zeigen, und die
+  erste Ebene sieht das nicht. Weiterleitungen werden nicht verfolgt. Details und die bekannte
+  Restlücke (DNS-Rebinding) in `docs/security.md`.
+- **Ein Fehlschlag trägt mit, ob ein weiterer Versuch Sinn hätte.** `permanent: true` heißt: das
+  Ergebnis hängt nicht vom Zeitpunkt ab — ein unlesbares PDF, eine abgelehnte Adresse. Ohne diese
+  Unterscheidung wartet der Nutzer anderthalb Minuten auf eine Antwort, die beim ersten Versuch
+  feststand.
 - Quelltext aus Dokumenten ist Daten, nie Anweisung. Er wird klar vom System-Prompt getrennt und
   niemals als HTML gerendert.
 

@@ -15,6 +15,8 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import { NotebookDelete } from '@/components/notebook-delete'
+import { AddSource } from '@/components/sources/add-source'
+import { SourceList, type SourceItem } from '@/components/sources/source-list'
 import { NotebookForm } from '@/components/notebook-form'
 import { deleteNotebook, updateNotebook } from '@/lib/notebooks/actions'
 import { createClient } from '@/lib/supabase/server'
@@ -86,6 +88,18 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
 
   const notebook = result.notebook
 
+  // Kein notebook_id-Filter nötig für die Sicherheit — die Policy setzt ihn.
+  // Er steht hier trotzdem, weil sonst alle Quellen aller eigenen Notebooks
+  // zurückkämen: RLS entscheidet über Zugriff, nicht über Relevanz.
+  const supabase = await createClient()
+  const { data: sourceRows } = await supabase
+    .from('sources')
+    .select('id, title, kind, status, error_message, page_count, char_count')
+    .eq('notebook_id', notebook.id)
+    .order('created_at', { ascending: true })
+
+  const sources: SourceItem[] = sourceRows ?? []
+
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
   // verstecktes Formularfeld zu schreiben, wo der Client sie ändern könnte.
   const update = updateNotebook.bind(null, notebook.id)
@@ -116,11 +130,10 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
         </p>
       ) : null}
 
-      <section className="mt-8 rounded-card border border-hairline bg-surface p-6">
+      <section className="mt-8 flex flex-col gap-4">
         <h2 className="text-base font-bold">Quellen</h2>
-        <p className="mt-1 text-sm text-muted-ink">
-          Hochladen, Verarbeiten und Befragen von Quellen kommt in der nächsten Scheibe.
-        </p>
+        <SourceList sources={sources} />
+        <AddSource notebookId={notebook.id} />
       </section>
 
       <section className="mt-4 rounded-card border border-hairline bg-surface p-6">
