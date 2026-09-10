@@ -9,16 +9,17 @@ Built with **Next.js 16, TypeScript and Supabase**.
 
 ## Repository layout
 
-| Path                   | Purpose                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `src/app/`             | Routes. Everything under `(app)/` is authenticated and `noindex`; the rest is public and static. |
-| `src/app/globals.css`  | Design tokens for both themes, mapped into Tailwind via `@theme inline`.                         |
-| `src/components/`      | Reusable components. Orchestration only.                                                         |
-| `src/lib/`             | Pure core — no network, no database, no browser. Unit tested in `__tests__/`.                    |
-| `e2e/`                 | Playwright specs, numbered to match `docs/testplan.md`.                                          |
-| `supabase/migrations/` | Hand-written SQL. Every policy and index carries its reason.                                     |
-| `design/`              | The design canvas. Open `design/canvas.html` in a browser.                                       |
-| `docs/adr/`            | Why things are the way they are, including what was deliberately left out.                       |
+| Path                       | Purpose                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/app/`                 | Routes. Everything under `src/app/app/` requires a session and is `noindex`; the rest is public and static. |
+| `src/app/globals.css`      | Design tokens for both themes, mapped into Tailwind via `@theme inline`.                                    |
+| `src/components/`          | Reusable components. Orchestration only.                                                                    |
+| `src/lib/`                 | Pure functions — no network, no database, no browser. Unit tested in `__tests__/`.                          |
+| `src/lib/{supabase,auth}/` | The integration seam. These do talk to Supabase; everything they can decide without it lives one level up.  |
+| `e2e/`                     | Playwright specs, numbered to match `docs/testplan.md`.                                                     |
+| `supabase/migrations/`     | Hand-written SQL. Every policy and index carries its reason.                                                |
+| `design/`                  | The design canvas. Open `design/canvas.html` in a browser.                                                  |
+| `docs/adr/`                | Why things are the way they are, including what was deliberately left out.                                  |
 
 ## Getting started
 
