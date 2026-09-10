@@ -157,6 +157,15 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
   `SECURITY DEFINER` liefen sie als `postgres`, umgingen RLS und wären ein Datenleck mit
   Aufruf-Interface.
 - **Fehlender Zugriff ergibt 404, nie 403.** Ein 403 bestätigt, dass die Ressource existiert.
+
+  Damit das auch als HTTP-Status ankommt, darf **keine `loading.tsx` über einer Route liegen,
+  die `notFound()` aufrufen kann**. Eine `loading.tsx` erzeugt eine Suspense-Grenze für ihren
+  ganzen Teilbaum; Next schickt die Hülle sofort los und legt den Status damit auf 200 fest, und
+  ein späteres `notFound()` kann ihn nicht mehr ändern. Die Seite zeigt dann „nicht gefunden“
+  und antwortet mit 200. Nachgemessen: ohne die Datei 404, mit ihr 200, bei identischem Code.
+  Deshalb liegt der Ladezustand der Übersicht in der Route-Gruppe `(uebersicht)` und nicht eine
+  Ebene höher.
+
 - **Nie stumm scheitern.** Fehler werden als `status='failed'` samt `error_message` persistiert.
 - Beim URL-Import holt der Server eine vom Nutzer angegebene Adresse: `localhost`, `127.0.0.0/8`,
   `169.254.169.254`, private Netze und Nicht-HTTP(S)-Schemata werden **vor** dem Abruf abgelehnt,

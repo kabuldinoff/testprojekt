@@ -9,6 +9,25 @@
  * Die Platzhalter haben die Maße der echten Karten. Das ist keine Kosmetik:
  * ein Skelett in anderer Größe erzeugt beim Austausch einen Layout-Sprung, und
  * der zählt bei Lighthouse als CLS.
+ *
+ * ── Warum diese Datei in einer Route-Gruppe liegt ──────────────────────────
+ *
+ * Eine `loading.tsx` erzeugt eine Suspense-Grenze für ihren gesamten Teilbaum.
+ * Next schickt die Hülle dann sofort los — und mit ihr den HTTP-Status 200.
+ * Ein `notFound()`, das später in der Seite fällt, kann den Status nicht mehr
+ * ändern; die Seite zeigt dann zwar „nicht gefunden", antwortet aber mit 200.
+ *
+ * Genau das ist passiert, als diese Datei noch eine Ebene höher lag: der
+ * Aufruf eines fremden Notebooks lieferte 200 statt 404. Nachgemessen — ohne
+ * die Datei 404, mit ihr 200, bei sonst identischem Code.
+ *
+ * Die Gruppe `(uebersicht)` ändert die URL nicht (die Seite bleibt `/app`),
+ * begrenzt die Suspense-Grenze aber auf die Liste. `/app/[notebookId]` liegt
+ * außerhalb und behält seinen 404.
+ *
+ * Die Detailseite bekommt bewusst keinen eigenen Ladezustand: sie macht genau
+ * eine schnelle Abfrage, und ein korrekter Statuscode ist mehr wert als ein
+ * Skelett für wenige Millisekunden.
  */
 export default function Loading() {
   return (

@@ -37,7 +37,9 @@ export function Field({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(
-          'w-full rounded-control border bg-surface px-3.5 py-2.5 text-sm text-ink',
+          // 16px auf Mobilgeräten: iOS Safari zoomt beim Fokus in jedes Feld
+          // unter 16px hinein und verlässt dabei den Viewport. Ab sm wieder 14px.
+          'w-full rounded-control border bg-surface px-3.5 py-2.5 text-base text-ink sm:text-sm',
           'placeholder:text-faint-ink',
           error ? 'border-err' : 'border-hairline',
           className
