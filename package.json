@@ -18,15 +18,21 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "next build && playwright test",
-    "test:e2e:ui": "next build && playwright test --ui",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
+    "test:e2e": "node scripts/e2e.mjs test",
+    "test:e2e:ui": "node scripts/e2e.mjs test --ui",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -38,6 +44,7 @@
     "eslint-config-next": "16.3.4",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.6",
+    "supabase": "^2.117.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^5.0.0"
