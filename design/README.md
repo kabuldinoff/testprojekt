@@ -23,11 +23,11 @@ Jedes Artboard trägt eine Begründung, warum es so aussieht.
 Die Werte sind nicht geschätzt, sondern per `getComputedStyle` aus den Referenzseiten
 ausgelesen:
 
-| Quelle | Übernommen |
-|---|---|
+| Quelle          | Übernommen                                                                                                                                                                              |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | relationflow.io | Primärblau `#2563EB`, Hover `#1D4ED8`, Tinte `#0E1424`, Radien 16 / 12 / 999 px, der dunkle Verlauf `#0E1424 → #1B2640`, der kursive Serif-Akzent auf einem einzelnen Wort der Headline |
-| kiberatung.de | Akzentgold `#FAEF70`, Gold-auf-Hell `#8A8030` |
-| NotebookLM | Der weiche Verlaufshintergrund und die großzügigen Panel-Radien |
+| kiberatung.de   | Akzentgold `#FAEF70`, Gold-auf-Hell `#8A8030`                                                                                                                                           |
+| NotebookLM      | Der weiche Verlaufshintergrund und die großzügigen Panel-Radien                                                                                                                         |
 
 Satoshi (RelationFlow) ist lizenzpflichtig; ersetzt durch **Plus Jakarta Sans**
 (SIL OFL, geometrisch-humanistisch, optisch sehr nah). Serif-Akzent: **Lora**.
