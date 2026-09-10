@@ -6,11 +6,13 @@ Prüfpunkt zugeordnet werden kann.
 
 ## Automatisiert
 
-| ID  | Datei                       | Prüft                                                                                                                   |
-| --- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| a0  | `e2e/a0-foundation.spec.ts` | Dark ist Default ohne Blitz, Umschalter in beide Richtungen, Wahl überlebt Reload, selbst gehostete Schriften kommen an |
+| ID  | Datei                          | Prüft                                                                                                                                                                                 |
+| --- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a0  | `e2e/a0-foundation.spec.ts`    | Dark ist Default ohne Blitz, Umschalter in beide Richtungen, Wahl überlebt Reload, selbst gehostete Schriften kommen an                                                               |
+| a1  | `e2e/a1-auth.spec.ts`          | Registrierung, Anmeldung, Abmeldung; geschützter Bereich leitet mit Rückweg um; falsche Zugangsdaten verraten nicht, ob das Konto existiert                                           |
+| a2  | `e2e/a2-rls-isolation.spec.ts` | Mandantentrennung, direkt gegen PostgREST mit gültigem Fremdtoken: lesen, ändern, löschen, unterschieben — alles wirkungslos. Plus die Gegenprobe, dass `heartbeat` bewusst offen ist |
 
-Geplant, in der Reihenfolge der Umsetzung: `a1-auth`, `a2-rls-isolation`, `b1-notebook-crud`,
+Geplant, in der Reihenfolge der Umsetzung: `b1-notebook-crud`,
 `b2-upload-ingest`, `b3-chat-citations`, `b4-audio-overview`, `c1-responsive`, `c2-a11y`,
 `d1-landing-seo`, `d2-design-tokens`.
 
@@ -21,6 +23,10 @@ Typen und Unit-Tests nacheinander aus.
 
 Diese Punkte lassen sich nicht sinnvoll automatisieren oder prüfen etwas, das nur ein Mensch
 beurteilen kann.
+
+> Die e2e-Suite läuft ausschließlich gegen den lokalen Supabase-Stack (`pnpm supabase:start`).
+> Sie legt Konten an und schreibt Zeilen; `scripts/e2e.mjs` bricht ab, wenn kein lokaler Stack
+> läuft, damit sie nicht versehentlich auf die echte Datenbank zeigt.
 
 **Fundament**
 

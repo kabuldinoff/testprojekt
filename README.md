@@ -9,15 +9,16 @@ Built with **Next.js 16, TypeScript and Supabase**.
 
 ## Repository layout
 
-| Path                  | Purpose                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| `src/app/`            | Routes. Everything under `(app)/` is authenticated and `noindex`; the rest is public and static. |
-| `src/app/globals.css` | Design tokens for both themes, mapped into Tailwind via `@theme inline`.                         |
-| `src/components/`     | Reusable components. Orchestration only.                                                         |
-| `src/lib/`            | Pure core — no network, no database, no browser. Unit tested in `__tests__/`.                    |
-| `e2e/`                | Playwright specs, numbered to match `docs/testplan.md`.                                          |
-| `design/`             | The design canvas. Open `design/canvas.html` in a browser.                                       |
-| `docs/adr/`           | Why things are the way they are, including what was deliberately left out.                       |
+| Path                   | Purpose                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `src/app/`             | Routes. Everything under `(app)/` is authenticated and `noindex`; the rest is public and static. |
+| `src/app/globals.css`  | Design tokens for both themes, mapped into Tailwind via `@theme inline`.                         |
+| `src/components/`      | Reusable components. Orchestration only.                                                         |
+| `src/lib/`             | Pure core — no network, no database, no browser. Unit tested in `__tests__/`.                    |
+| `e2e/`                 | Playwright specs, numbered to match `docs/testplan.md`.                                          |
+| `supabase/migrations/` | Hand-written SQL. Every policy and index carries its reason.                                     |
+| `design/`              | The design canvas. Open `design/canvas.html` in a browser.                                       |
+| `docs/adr/`            | Why things are the way they are, including what was deliberately left out.                       |
 
 ## Getting started
 
@@ -30,19 +31,34 @@ cp .env.example .env.local              # then fill in the values
 pnpm dev
 ```
 
+The end-to-end suite runs against a **local** Supabase stack, never a real project — it creates
+accounts and writes rows. Docker is required:
+
+```bash
+pnpm supabase:start   # the first run pulls a few images
+pnpm test:e2e
+```
+
+`scripts/e2e.mjs` reads the credentials out of the running stack and refuses to start if there
+is none, so the suite cannot accidentally point at production. The local ports sit on `5442x`
+rather than Supabase's default `5432x`, so a second local Supabase project on the same machine
+does not collide.
+
 > The Playwright browser download is a separate step on purpose. It fetches a pinned Chromium
 > build of a few hundred megabytes, so it does not belong in `pnpm install` — and it needs to
 > succeed only on machines that actually run the end-to-end suite.
 
 ## Commands
 
-| Command         | What it does                                                                  |
-| --------------- | ----------------------------------------------------------------------------- |
-| `pnpm dev`      | Development server                                                            |
-| `pnpm verify`   | `format:check` + `lint` + `typecheck` + `test` — the gate before every commit |
-| `pnpm test`     | Vitest over the pure functions in `src/lib/`                                  |
-| `pnpm test:e2e` | Production build, then Playwright against it                                  |
-| `pnpm format`   | Prettier, writing                                                             |
+| Command               | What it does                                                                  |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `pnpm dev`            | Development server                                                            |
+| `pnpm verify`         | `format:check` + `lint` + `typecheck` + `test` — the gate before every commit |
+| `pnpm test`           | Vitest over the pure functions in `src/lib/`                                  |
+| `pnpm test:e2e`       | Local Supabase stack → production build → Playwright                          |
+| `pnpm supabase:start` | Local Postgres, Auth and Storage in Docker                                    |
+| `pnpm supabase:reset` | Wipe the local database and replay every migration                            |
+| `pnpm format`         | Prettier, writing                                                             |
 
 `pnpm typecheck` runs `next typegen` first. Without it the generated route types (`LayoutProps`,
 `PageProps`) do not exist yet and `tsc` fails on a fresh clone.

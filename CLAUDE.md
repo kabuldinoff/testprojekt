@@ -24,7 +24,7 @@ Datei hier ergänzt die Projektregeln.
 
 ## Struktur
 
-- **`src/app/`** — Routen. `(app)/**` ist authentifiziert und trägt `noindex`; alles außerhalb
+- **`src/app/`** — Routen. `app/**` ist authentifiziert und trägt `noindex`; alles außerhalb
   ist öffentlich und statisch. Die Trennung ist nicht kosmetisch: die öffentliche Seite hält die
   Lighthouse-Werte, weil sie **kein Client-JS außer Theme-Umschalter und Anmeldeknopf** lädt.
   Der Chat-Client und der PDF-Betrachter dürfen ausschließlich unter `(app)/` und nur per
@@ -40,7 +40,15 @@ Datei hier ergänzt die Projektregeln.
   und ohne Browser testbar und hat einen Test in `__tests__/` daneben. Das ist die Regel, die
   Testbarkeit überhaupt erst ermöglicht — nicht eine Abdeckungsquote.
 - **`e2e/`** — Playwright. Dateinamen nummeriert wie `docs/testplan.md` (`a0-…`, `a1-…`), damit
-  ein roter Test sofort einem Prüfpunkt zuzuordnen ist.
+  ein roter Test sofort einem Prüfpunkt zuzuordnen ist. Die Suite läuft **ausschließlich gegen
+  den lokalen Supabase-Stack**: sie legt Konten an und schreibt Zeilen. `scripts/e2e.mjs` holt
+  die Zugangsdaten aus `supabase status` und bricht ab, wenn nichts läuft — damit kann sie gar
+  nicht versehentlich auf die echte Datenbank zeigen.
+- **`supabase/migrations/`** — handgeschriebenes SQL, durchnummeriert. Über jeder Policy und
+  jedem Index steht der Grund. Die Migrationen sind **wiederholbar**: `supabase db reset` läuft
+  im Alltag oft, also darf keine an einem bereits vorhandenen Objekt scheitern.
+  Erweiterungen (`vector`, `pg_cron`, `pg_net`) werden hier angelegt, nicht im Dashboard —
+  im Dashboard gilt es für ein Projekt, hier für jede Umgebung.
 - **`design/`** — der Design-Canvas. Verbindliche Referenz für Farben, Radien und Schriften,
   entstanden vor der ersten Komponente. Bewusst **nicht** gitignoriert.
 - **`docs/adr/`** — jede Entscheidung, die jemand hinterfragen könnte, mit Kontext, Alternativen
@@ -53,7 +61,9 @@ Datei hier ergänzt die Projektregeln.
 pnpm dev              Entwicklungsserver
 pnpm verify           format:check + lint + typecheck + test — das Tor vor jedem Commit
 pnpm test             Vitest (reine Funktionen)
-pnpm test:e2e         next build && Playwright gegen den Produktions-Build
+pnpm supabase:start   lokaler Postgres/Auth/Storage in Docker (Ports 5442x)
+pnpm test:e2e         lokaler Stack → Produktions-Build → Playwright
+pnpm supabase:reset   lokale Datenbank leeren und alle Migrationen neu anwenden
 pnpm format           Prettier schreiben
 ```
 
@@ -116,9 +126,20 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
 - In jeder Policy: **`(select auth.uid())`** statt `auth.uid()` (InitPlan statt Auswertung pro
   Zeile), **immer `to authenticated`** (sonst wird die Policy auch für `anon` evaluiert) und
   **immer ein Index auf der Spalte, nach der die Policy filtert**.
-- **Der `service_role`-Client wird ausschließlich im Ingestion-Worker benutzt**, und erst
-  nachdem die aufrufende Route den Besitz über den RLS-Client verifiziert hat. Ein Unit-Test
-  prüft den Import-Graph und schlägt fehl, sobald er aus `src/app/(app)/**` erreichbar ist.
+- **Der `service_role`-Client (`src/lib/supabase/admin.ts`) wird ausschließlich im
+  Ingestion-Worker benutzt**, und erst nachdem die aufrufende Route den Besitz über den
+  RLS-Client verifiziert hat. `src/lib/__tests__/admin-client-isolation.test.ts` folgt dem
+  Import-Graph und schlägt fehl, sobald er aus `src/app/**` erreichbar wird — auch indirekt
+  über eine Zwischenschicht. Die Fehlermeldung zeigt die ganze Kette.
+- **Drei Ebenen, absichtlich verschieden:** die Middleware leitet um (Bequemlichkeit), das
+  Layout unter `src/app/app/` prüft beim Rendern (Korrektheit), RLS in der Datenbank ist die
+  eigentliche Grenze (Sicherheit). Fielen die ersten beiden aus, käme trotzdem nichts heraus.
+- **`getUser()`, nie `getSession()`,** wo über Zugriff entschieden wird. `getSession` liest das
+  Cookie und vertraut ihm; `getUser` prüft die Signatur beim Auth-Server.
+- **Das Projekt wurde ohne „automatically expose new tables" angelegt.** Neue Tabellen sind für
+  die Data-API zunächst unsichtbar; jeder Zugriff wird pro Tabelle per `grant` bewusst gewährt.
+  Für `anon` ergibt eine Abfrage auf `notebooks` deshalb `401 permission denied` und nicht etwa
+  eine leere Liste — RLS ist damit das zweite Netz, nicht das einzige.
 - **Datenbankfunktionen, die PostgREST exponiert, sind `SECURITY INVOKER`.** Mit
   `SECURITY DEFINER` liefen sie als `postgres`, umgingen RLS und wären ein Datenleck mit
   Aufruf-Interface.
