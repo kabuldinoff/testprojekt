@@ -26,10 +26,44 @@ function required(name: string, value: string | undefined): string {
   return value
 }
 
+/**
+ * Ob eine Supabase-URL verschlüsselt genug ist, um Zugangsdaten darüber zu
+ * schicken.
+ *
+ * Über diese Adresse gehen Passwörter bei Anmeldung und Registrierung. Eine
+ * versehentlich auf `http://` konfigurierte Produktionsumgebung würde sie im
+ * Klartext übertragen, und niemandem fiele es auf — die App funktioniert ja.
+ *
+ * Die Ausnahme ist der lokale Stack: der läuft ohne TLS auf 127.0.0.1, und
+ * dort gibt es kein Netz, auf dem jemand mithören könnte. `localhost` und
+ * `127.0.0.1` sind deshalb erlaubt, `http://` auf allem anderen nicht.
+ *
+ * Exportiert, weil die Regel ohne Umgebung testbar sein soll.
+ */
+export function isAcceptableSupabaseUrl(raw: string): boolean {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return false
+  }
+  if (url.protocol === 'https:') return true
+  if (url.protocol !== 'http:') return false
+  return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'
+}
+
 /** Im Browser und auf dem Server verfügbar. Enthält nichts Geheimes. */
 export function publicEnv() {
+  const supabaseUrl = required('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+  if (!isAcceptableSupabaseUrl(supabaseUrl)) {
+    throw new Error(
+      `NEXT_PUBLIC_SUPABASE_URL muss https:// sein (Ausnahme: localhost). Gesetzt ist: ${supabaseUrl}`
+    )
+  }
+
   return {
-    supabaseUrl: required('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
+    supabaseUrl,
     supabasePublishableKey: required(
       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY

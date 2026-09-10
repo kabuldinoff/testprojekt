@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
+import { safeReturnPath } from '@/lib/routing'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -34,14 +35,6 @@ const credentials = z.object({
   password: z.string().min(8, 'Mindestens 8 Zeichen.')
 })
 
-/** Prüft, ob ein Weiterleitungsziel intern ist — sonst ist es ein offener Redirect. */
-function safeNext(value: FormDataEntryValue | null): string {
-  const next = typeof value === 'string' ? value : ''
-  // Nur Pfade, die mit genau einem Schrägstrich beginnen. "//example.com" wäre
-  // protokollrelativ und würde den Nutzer auf eine fremde Domain schicken.
-  return /^\/(?!\/)/.test(next) ? next : '/app'
-}
-
 export async function signIn(_previous: FormState, formData: FormData): Promise<FormState> {
   const parsed = credentials.safeParse({
     email: formData.get('email'),
@@ -62,7 +55,7 @@ export async function signIn(_previous: FormState, formData: FormData): Promise<
   }
 
   revalidatePath('/', 'layout')
-  redirect(safeNext(formData.get('weiter')))
+  redirect(safeReturnPath(formData.get('weiter')))
 }
 
 export async function signUp(_previous: FormState, formData: FormData): Promise<FormState> {

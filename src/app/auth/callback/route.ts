@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { safeReturnPath } from '@/lib/routing'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -14,11 +15,11 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
 
-  // Dieselbe Prüfung wie in den Server Actions: nur interne Pfade. Ein
-  // Weiterleitungsziel aus der URL ist sonst ein offener Redirect, und
-  // ausgerechnet nach einer Anmeldung ist das eine gute Phishing-Bühne.
-  const raw = searchParams.get('weiter') ?? '/app'
-  const next = /^\/(?!\/)/.test(raw) ? raw : '/app'
+  // Dieselbe Prüfung wie in den Server Actions — und genau deshalb dieselbe
+  // Funktion. Zwei Kopien bedeuten, dass eine davon beim nächsten Fund nicht
+  // mitkorrigiert wird, und ein offener Redirect nach der Anmeldung ist eine
+  // gute Phishing-Bühne.
+  const next = safeReturnPath(searchParams.get('weiter'))
 
   if (!code) {
     return NextResponse.redirect(`${origin}/anmelden?fehler=kein-code`)

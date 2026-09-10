@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { publicEnv } from '@/lib/env'
+import { isProtectedPath } from '@/lib/routing'
 
 /**
  * Frischt bei jedem Request das Session-Cookie auf und schützt den
@@ -19,9 +20,6 @@ import { publicEnv } from '@/lib/env'
  * Datenbank — selbst wenn diese Datei fehlerhaft wäre, käme kein fremdes
  * Notebook heraus.
  */
-
-/** Bereiche, die eine Anmeldung voraussetzen. */
-const PROTECTED_PREFIX = '/app'
 
 /** Seiten, die einem angemeldeten Nutzer nichts mehr nützen. */
 const AUTH_ROUTES = ['/anmelden', '/registrieren']
@@ -61,7 +59,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (!user && pathname.startsWith(PROTECTED_PREFIX)) {
+  if (!user && isProtectedPath(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/anmelden'
     // Damit landet der Nutzer nach der Anmeldung dort, wo er hinwollte,
