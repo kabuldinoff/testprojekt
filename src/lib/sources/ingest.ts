@@ -65,29 +65,23 @@ interface SourceRow {
  * Übernommen wird, was `pending` ist oder dessen Lease abgelaufen ist.
  */
 async function claim(admin: Admin, sourceId: string): Promise<SourceRow | null> {
-  const now = new Date()
-  const lease = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString()
-
-  const { data } = await admin
-    .from('sources')
-    .update({ status: 'processing', lease_expires_at: lease })
-    .eq('id', sourceId)
-    .lt('attempts', MAX_ATTEMPTS)
-    .or(`status.eq.pending,and(status.eq.processing,lease_expires_at.lt.${now.toISOString()})`)
-    .select('id, notebook_id, kind, title, storage_path, source_url, status, attempts')
+  // Ein Aufruf, ein Statement. Die erste Fassung setzte erst die Lease und
+  // erhöhte danach `attempts` — stirbt der Prozess dazwischen, verbraucht der
+  // Lauf keinen Versuch, der Reaper gibt die Quelle wieder frei, und sie
+  // erreicht MAX_ATTEMPTS nie. Sie kreist endlos, ohne je zu scheitern.
+  const { data, error } = await admin
+    .rpc('claim_source', {
+      p_source_id: sourceId,
+      p_lease_minutes: LEASE_MINUTES,
+      p_max_attempts: MAX_ATTEMPTS
+    })
     .maybeSingle()
 
-  if (!data) return null
-
-  // Der Zähler wird beim Übernehmen erhöht, nicht beim Scheitern. Ein Lauf,
-  // der mitten drin stirbt, kommt sonst nie in die Nähe der Obergrenze und
-  // wird ewig neu angestoßen.
-  await admin
-    .from('sources')
-    .update({ attempts: data.attempts + 1 })
-    .eq('id', sourceId)
-
-  return { ...data, attempts: data.attempts + 1 }
+  if (error) {
+    console.error('[ingest] Übernahme fehlgeschlagen', sourceId, error)
+    return null
+  }
+  return (data as SourceRow | null) ?? null
 }
 
 /**
@@ -106,7 +100,7 @@ async function fail(
 ) {
   const endgueltig = permanent || attempts >= MAX_ATTEMPTS
 
-  await admin
+  const { error } = await admin
     .from('sources')
     .update({
       // Vor dem letzten Versuch zurück auf `pending`: dann holt der Reaper sie
@@ -116,6 +110,12 @@ async function fail(
       lease_expires_at: null
     })
     .eq('id', sourceId)
+
+  // Schlägt der Zustandswechsel selbst fehl, bleibt die Quelle auf
+  // 'processing' stehen, bis die Lease abläuft. Das ist verkraftbar — der
+  // Reaper holt sie — aber es darf nicht unbemerkt bleiben, sonst sucht
+  // niemand nach der Ursache.
+  if (error) console.error('[ingest] Zustandswechsel auf failed misslungen', sourceId, error)
 }
 
 /** Holt den Rohtext, je nach Art der Quelle. */
@@ -191,7 +191,20 @@ export async function ingestSource(sourceId: string): Promise<IngestOutcome> {
 
   // Erst löschen, dann schreiben. Ohne das liefe ein zweiter Versuch in die
   // Eindeutigkeitsbedingung auf (source_id, chunk_index).
-  await admin.from('source_chunks').delete().eq('source_id', sourceId)
+  const { error: deleteError } = await admin
+    .from('source_chunks')
+    .delete()
+    .eq('source_id', sourceId)
+
+  if (deleteError) {
+    // Bliebe der Fehler unbeachtet, liefe das folgende Einfügen in die
+    // Eindeutigkeitsbedingung — und der Versuch würde als „Abschnitte konnten
+    // nicht gespeichert werden" gezählt, obwohl die Quelle in Ordnung ist.
+    // Nach drei solchen Runden wäre sie endgültig fehlgeschlagen.
+    const message = 'Die alten Abschnitte konnten nicht entfernt werden.'
+    await fail(admin, sourceId, message, source.attempts, false)
+    return { status: 'failed', message }
+  }
 
   const { error: insertError } = await admin.from('source_chunks').insert(
     chunks.map((c) => ({
@@ -215,7 +228,7 @@ export async function ingestSource(sourceId: string): Promise<IngestOutcome> {
   const charCount = pages.reduce((sum, p) => sum + p.text.length, 0)
   const pageCount = pages.filter((p) => p.number !== null).length
 
-  await admin
+  const { error: finishError } = await admin
     .from('sources')
     .update({
       status: 'ready',
@@ -227,6 +240,15 @@ export async function ingestSource(sourceId: string): Promise<IngestOutcome> {
       ...(parsed.title && source.kind === 'url' ? { title: parsed.title.slice(0, 300) } : {})
     })
     .eq('id', sourceId)
+
+  if (finishError) {
+    // Ohne diese Prüfung meldete die Funktion `ready`, während die Zeile auf
+    // 'processing' stehen bliebe: der Client fragt endlos weiter ab, und der
+    // Reaper übernimmt dieselbe Quelle später noch einmal.
+    const message = 'Der Abschluss der Verarbeitung konnte nicht gespeichert werden.'
+    await fail(admin, sourceId, message, source.attempts, false)
+    return { status: 'failed', message }
+  }
 
   return { status: 'ready', chunks: chunks.length }
 }

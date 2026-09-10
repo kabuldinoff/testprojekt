@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { createSourceInput } from '@/lib/sources/schema'
+import {
+  MAX_SOURCE_TITLE_CHARS,
+  createSourceInput,
+  sourceInsertMessage
+} from '@/lib/sources/schema'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -67,13 +71,14 @@ export async function POST(request: NextRequest) {
       .insert({
         notebook_id: input.notebookId,
         kind: 'url',
-        title: input.url.slice(0, 300),
+        title: input.url.slice(0, MAX_SOURCE_TITLE_CHARS),
         source_url: input.url
       })
       .select('id')
       .single()
 
-    if (error || !data) return NextResponse.json({ error: limitMessage(error) }, { status: 400 })
+    if (error || !data)
+      return NextResponse.json({ error: sourceInsertMessage(error) }, { status: 400 })
     return NextResponse.json({ sourceId: data.id })
   }
 
@@ -81,6 +86,30 @@ export async function POST(request: NextRequest) {
   // Der erste Pfadabschnitt ist die Nutzer-ID — daran hängt die
   // Storage-Policy. Sie kommt aus dem geprüften Token, nicht aus dem Request.
   const storagePath = `${user.id}/${input.notebookId}/${sourceId}`
+
+  // Reihenfolge: **erst die Zeile, dann die Datei.** Die Storage-Policy
+  // verlangt, dass zum Pfad bereits eine Quelle existiert — sonst könnte
+  // jeder beliebig viele Dateien unter seinem Präfix ablegen und die
+  // Mengenbegrenzung von 20 Quellen zählte nur Zeilen, nicht Bytes.
+  //
+  // Für Datei-Uploads galt das ohnehin: die Zeile entsteht, bevor der Client
+  // die Signed URL bekommt. Beim eingefügten Text war es zunächst andersherum,
+  // und der Upload scheiterte an genau dieser Policy.
+  const { data, error } = await supabase
+    .from('sources')
+    .insert({
+      id: sourceId,
+      notebook_id: input.notebookId,
+      kind: input.kind,
+      title: input.title,
+      storage_path: storagePath
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    return NextResponse.json({ error: sourceInsertMessage(error) }, { status: 400 })
+  }
 
   if (input.kind === 'paste') {
     // Eingefügter Text läuft als einziger Inhalt durch die Function. Er ist
@@ -92,32 +121,14 @@ export async function POST(request: NextRequest) {
       .upload(storagePath, new Blob([input.content], { type: 'text/plain' }), {
         contentType: 'text/plain'
       })
+
     if (uploadError) {
+      // Ohne Aufräumen bliebe eine Quelle ohne Inhalt stehen, die gegen die
+      // Mengenbegrenzung zählt und nie verarbeitet werden kann.
+      await supabase.from('sources').delete().eq('id', data.id)
       return NextResponse.json({ error: 'Der Text konnte nicht abgelegt werden.' }, { status: 500 })
     }
-  }
 
-  const { data, error } = await supabase
-    .from('sources')
-    .insert({
-      id: sourceId,
-      notebook_id: input.notebookId,
-      kind: input.kind === 'paste' ? 'paste' : input.kind,
-      title: input.title,
-      storage_path: storagePath
-    })
-    .select('id')
-    .single()
-
-  if (error || !data) {
-    // Die Zeile ist nicht entstanden — eine schon hochgeladene Datei wäre
-    // sonst eine Leiche im Speicher, die gegen das Kontingent zählt und auf
-    // die nichts mehr verweist.
-    if (input.kind === 'paste') await supabase.storage.from('sources').remove([storagePath])
-    return NextResponse.json({ error: limitMessage(error) }, { status: 400 })
-  }
-
-  if (input.kind === 'paste') {
     return NextResponse.json({ sourceId: data.id })
   }
 
@@ -136,18 +147,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ sourceId: data.id, path: storagePath, token: signed.token })
-}
-
-/**
- * Übersetzt den Datenbankfehler der Mengenbegrenzung in einen Satz.
- *
- * Die Grenze steht als Trigger in der Migration, damit sie auch für Zugriffe
- * an der Anwendung vorbei gilt. Der Preis dafür ist, dass sie hier als
- * Postgres-Fehler ankommt und übersetzt werden muss.
- */
-function limitMessage(error: { message?: string } | null): string {
-  if (error?.message?.includes('höchstens 20 Quellen')) {
-    return 'Dieses Notebook fasst höchstens 20 Quellen.'
-  }
-  return 'Die Quelle konnte nicht angelegt werden.'
 }

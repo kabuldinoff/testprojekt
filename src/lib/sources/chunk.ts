@@ -181,13 +181,26 @@ function chunkPage(page: Page, startIndex: number): Chunk[] {
     cursor = overlapStart > cursor ? overlapStart : end
   }
 
-  // Ein zu kurzer letzter Abschnitt wird dem vorigen zugeschlagen.
+  // Ein zu kurzer letzter Abschnitt wird dem vorigen zugeschlagen — aber nur,
+  // wenn das Ergebnis die Obergrenze hält.
+  //
+  // Der Fall, der das nötig macht: ein Text aus 1600 Zeichen, dann viel
+  // Leerraum, dann ein einzelnes Zeichen. Der letzte Abschnitt schrumpft beim
+  // Trimmen auf ein Zeichen, und das blinde Zusammenlegen erzeugte einen
+  // Abschnitt von 2000 Zeichen — über MAX_CHARS, das jeder andere Abschnitt
+  // einhält.
   const last = chunks[chunks.length - 1]
   if (chunks.length > 1 && last && last.content.length < MIN_CHARS) {
     const previous = chunks[chunks.length - 2]!
-    previous.content = text.slice(previous.charStart, last.charEnd).trim()
-    previous.charEnd = last.charEnd
-    chunks.pop()
+    const merged = text.slice(previous.charStart, last.charEnd).trim()
+    if (merged.length <= MAX_CHARS) {
+      previous.content = merged
+      previous.charEnd = last.charEnd
+      chunks.pop()
+    }
+    // Passt es nicht, bleibt der kurze Abschnitt stehen. Ein Rest von wenigen
+    // Zeichen ist unschön, ein Abschnitt über der Obergrenze ist ein Bruch
+    // der Zusicherung, auf die sich alles Weitere verlässt.
   }
 
   return chunks

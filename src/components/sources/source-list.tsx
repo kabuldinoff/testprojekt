@@ -105,6 +105,7 @@ export function SourceList({ sources }: { sources: SourceItem[] }) {
             key={source.id}
             className="rounded-card border border-hairline bg-surface p-4"
             data-status={source.status}
+            data-source-id={source.id}
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">

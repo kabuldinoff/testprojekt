@@ -82,10 +82,28 @@ Ein Test pro Angriffsform steht in `src/lib/__tests__/sources-url-safety.test.ts
 beim Schreiben eine echte Lücke gefunden: Node normalisiert `::ffff:127.0.0.1` zu
 `::ffff:7f00:1`, und die erste Fassung prüfte nur die Punktform.
 
-**Bekannte Restlücke: DNS-Rebinding.** Zwischen Auflösung und Abruf kann sich die Antwort
-ändern. Sie zu schließen hieße, die Verbindung selbst aufzubauen statt `fetch` zu benutzen.
-Für ein Produkt, das öffentliche Artikel importiert, steht das nicht im Verhältnis — bewusst
-in Kauf genommen und hier genannt, statt unerwähnt zu bleiben.
+Die Antwort wird **stückweise** gelesen und der Reader abgebrochen, sobald 5 MB
+überschritten sind. `response.arrayBuffer()` wäre eine Zeile, liest aber erst alles und
+prüft dann — bei einer Antwort, die absichtlich nicht aufhört, ist der Speicher voll, bevor
+die Prüfung drankommt. Die Adresse gibt der Nutzer an; das ist kein hypothetischer Fall.
+
+**Bekannte Restlücke: DNS-Rebinding.** Zwischen der Auflösung und dem Abruf durch `fetch`
+kann sich die DNS-Antwort ändern: erst eine öffentliche Adresse für die Prüfung, dann eine
+private für die Verbindung.
+
+Sie zu schließen hieße, die Verbindung an die geprüfte IP zu binden — entweder mit einem
+eigenen `undici`-Dispatcher oder indem man `node:https` direkt benutzt und Host-Header sowie
+TLS-Servername von Hand setzt. Beides ist machbar, beides bringt Fallstricke bei SNI, ALPN
+und Weiterleitungen mit, die sich hier nicht gegen einen echten Gegenpart testen lassen. Eine
+halb korrekte Sicherheitsmaßnahme ist schlechter als eine dokumentierte Lücke.
+
+Dazu kommt, was auf **dieser** Bereitstellung erreichbar wäre: Vercel-Functions stellen
+keinen Metadatendienst bereit, wie EC2 ihn hat, und Supabase wird über das offene Netz mit
+einem Schlüssel angesprochen. Der Gewinn eines gelungenen Rebindings wäre also gering.
+
+**Was das ändern würde:** sobald diese Anwendung in einer Umgebung mit einem internen Netz
+oder einem Metadatendienst läuft — eigene Server, ein VPC, ein Kubernetes-Cluster — ist das
+hier zuerst zu beheben, vor allem anderen auf dieser Seite.
 
 ## Prompt Injection aus Quelldokumenten
 

@@ -21,8 +21,14 @@ export const ALLOWED_MIME = {
 
 export type FileKind = (typeof ALLOWED_MIME)[keyof typeof ALLOWED_MIME]
 
-/** Muss zum CHECK auf sources.title passen. */
-export const TITLE_MAX = 300
+/**
+ * Muss zum CHECK auf sources.title passen.
+ *
+ * Ein Wert, drei Stellen: Validierung, Kürzen im Client, `maxLength` am Feld.
+ * Stünde die 300 dreimal da, wäre nach der ersten Änderung eine davon falsch —
+ * und zwar die, die niemand anschaut.
+ */
+export const MAX_SOURCE_TITLE_CHARS = 300
 
 /**
  * Obergrenze für eingefügten Text.
@@ -33,7 +39,7 @@ export const TITLE_MAX = 300
  */
 export const MAX_PASTE_CHARS = 500_000
 
-const title = z.string().trim().min(1, 'Bitte einen Titel angeben.').max(TITLE_MAX)
+const title = z.string().trim().min(1, 'Bitte einen Titel angeben.').max(MAX_SOURCE_TITLE_CHARS)
 
 export const fileSourceInput = z.object({
   notebookId: z.uuid('Ungültiges Notebook.'),
@@ -79,4 +85,62 @@ export type CreateSourceInput = z.infer<typeof createSourceInput>
 export function kindFromMime(mime: string): FileKind | null {
   const clean = mime.split(';')[0]?.trim().toLowerCase() ?? ''
   return ALLOWED_MIME[clean as keyof typeof ALLOWED_MIME] ?? null
+}
+
+/**
+ * Dateiendungen als Rückfallebene — und **nur** als solche.
+ *
+ * Browser liefern für `.md` und je nach Betriebssystem auch für `.txt` einen
+ * leeren `File.type`. Verlässt man sich allein auf den MIME-Typ, lehnt der
+ * Upload genau die Textdateien ab, für die er gedacht ist.
+ *
+ * Die Endung entscheidet trotzdem nicht über den Parser, sondern nur darüber,
+ * *welchen kanonischen MIME-Typ* wir beim Hochladen mitgeben. Der Bucket
+ * prüft dagegen, und der Parser richtet sich nach `kind` in der Datenbank.
+ * Eine umbenannte Datei führt also zu einem Parser, der scheitert — nicht zu
+ * einer Umgehung.
+ */
+const EXTENSION_FALLBACK: Record<string, { kind: FileKind; mime: string }> = {
+  txt: { kind: 'text', mime: 'text/plain' },
+  md: { kind: 'markdown', mime: 'text/markdown' },
+  markdown: { kind: 'markdown', mime: 'text/markdown' },
+  pdf: { kind: 'pdf', mime: 'application/pdf' }
+}
+
+export interface FileClassification {
+  kind: FileKind
+  /** Kanonischer MIME-Typ für den Upload — muss der Bucket akzeptieren. */
+  mime: string
+}
+
+/**
+ * Bestimmt Art und MIME-Typ einer Datei.
+ *
+ * Erst der vom Browser gemeldete Typ, dann die Endung. `null`, wenn beides
+ * nichts hergibt.
+ */
+export function classifyFile(fileName: string, browserMime: string): FileClassification | null {
+  const fromMime = kindFromMime(browserMime)
+  if (fromMime) {
+    const clean = browserMime.split(';')[0]!.trim().toLowerCase()
+    return { kind: fromMime, mime: clean }
+  }
+
+  const extension = fileName.toLowerCase().split('.').pop() ?? ''
+  return EXTENSION_FALLBACK[extension] ?? null
+}
+
+/**
+ * Übersetzt den Datenbankfehler der Mengenbegrenzung in einen Satz.
+ *
+ * Die Grenze steht als Trigger in der Migration, damit sie auch für Zugriffe
+ * an der Anwendung vorbei gilt. Der Preis: sie kommt als Postgres-Fehler an
+ * und muss übersetzt werden. Das ist reine Zuordnung ohne I/O und gehört
+ * deshalb hierher und nicht in den Route Handler.
+ */
+export function sourceInsertMessage(error: { message?: string } | null): string {
+  if (error?.message?.includes('höchstens 20 Quellen')) {
+    return 'Dieses Notebook fasst höchstens 20 Quellen.'
+  }
+  return 'Die Quelle konnte nicht angelegt werden.'
 }

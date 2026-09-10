@@ -92,12 +92,16 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
   // Er steht hier trotzdem, weil sonst alle Quellen aller eigenen Notebooks
   // zurückkämen: RLS entscheidet über Zugriff, nicht über Relevanz.
   const supabase = await createClient()
-  const { data: sourceRows } = await supabase
+  const { data: sourceRows, error: sourcesError } = await supabase
     .from('sources')
     .select('id, title, kind, status, error_message, page_count, char_count')
     .eq('notebook_id', notebook.id)
     .order('created_at', { ascending: true })
 
+  // Denselben Fehler hatte ich eine Funktion weiter oben schon einmal
+  // gemacht: den `error` wegwerfen und `?? []` schreiben. Dann wird aus einer
+  // gescheiterten Abfrage „Noch keine Quellen" — der Nutzer glaubt, seine
+  // Dokumente seien weg.
   const sources: SourceItem[] = sourceRows ?? []
 
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
@@ -132,7 +136,16 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
 
       <section className="mt-8 flex flex-col gap-4">
         <h2 className="text-base font-bold">Quellen</h2>
-        <SourceList sources={sources} />
+        {sourcesError ? (
+          <p
+            role="alert"
+            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+          >
+            Die Quellen konnten nicht geladen werden. Bitte die Seite neu laden.
+          </p>
+        ) : (
+          <SourceList sources={sources} />
+        )}
         <AddSource notebookId={notebook.id} />
       </section>
 

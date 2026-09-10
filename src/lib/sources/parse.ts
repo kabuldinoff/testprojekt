@@ -44,6 +44,50 @@ const FETCH_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
 /**
+ * Liest den Antwortkörper und bricht ab, sobald die Grenze überschritten ist.
+ *
+ * `response.arrayBuffer()` wäre eine Zeile, liest aber **erst alles** und
+ * prüft **dann** die Größe — bei einer Antwort, die absichtlich nicht aufhört,
+ * ist der Speicher voll, bevor die Prüfung überhaupt drankommt. Die Adresse
+ * gibt der Nutzer an; das ist also kein hypothetischer Fall.
+ *
+ * Deshalb stückweise lesen, mitzählen und den Reader abbrechen. Das Abbrechen
+ * ist der Punkt: ohne `cancel()` liefe der Download im Hintergrund weiter.
+ *
+ * @returns Den Text, oder `null` wenn die Grenze überschritten wurde.
+ */
+async function readCapped(response: Response, maxBytes: number): Promise<string | null> {
+  if (!response.body) return ''
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        return null
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const joined = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    joined.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(joined)
+}
+
+/**
  * PDF → eine Seite pro Seite.
  *
  * `mergePages: false` ist die wichtigste Zeile hier. Mit `true` bekäme man
@@ -172,11 +216,16 @@ export async function fetchArticle(rawUrl: string): Promise<ParseResult> {
       return { ok: false, message: 'Unter dieser Adresse liegt keine Webseite.', permanent: true }
     }
 
-    const buffer = await response.arrayBuffer()
-    if (buffer.byteLength > MAX_RESPONSE_BYTES) {
-      return { ok: false, message: 'Diese Seite ist zu groß.', permanent: true }
-    }
-    html = new TextDecoder().decode(buffer)
+    const tooLarge = { ok: false as const, message: 'Diese Seite ist zu groß.', permanent: true }
+
+    // Content-Length ist der billige Weg, aber kein Verlass: der Header kann
+    // fehlen oder lügen. Er spart nur den Verbindungsaufbau im ehrlichen Fall.
+    const declared = Number(response.headers.get('content-length') ?? '')
+    if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) return tooLarge
+
+    const body = await readCapped(response, MAX_RESPONSE_BYTES)
+    if (!body) return tooLarge
+    html = body
   } catch {
     // Zeitüberschreitung oder Verbindungsabbruch — beides kann vorübergehen.
     return { ok: false, message: 'Die Seite konnte nicht abgerufen werden.', permanent: false }

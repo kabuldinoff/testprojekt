@@ -71,7 +71,22 @@ function isPrivateIPv4(host: string): boolean {
 function isPrivateIPv6(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, '').toLowerCase()
   if (h === '::1' || h === '::' || h === '0:0:0:0:0:0:0:1') return true
-  if (h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return true
+
+  // Link-local ist fe80::/10, nicht fe80::/16. Die erste Fassung prüfte auf
+  // das Präfix "fe80:" und ließ damit fe90::1 und febf::1 durch — beide
+  // ebenfalls link-local. Nachgemessen.
+  //
+  // Geprüft wird deshalb das erste Hextet gegen die /10-Maske. fec0::/10 ist
+  // das abgekündigte site-local und wird gleich mit abgelehnt: es ist
+  // reserviert, und eine Adresse daraus gehört in keinen Abruf.
+  const firstHextet = Number.parseInt(h.split(':')[0] || '0', 16)
+  if (Number.isFinite(firstHextet)) {
+    const masked = firstHextet & 0xffc0
+    if (masked === 0xfe80 || masked === 0xfec0) return true
+  }
+
+  // Unique local: fc00::/7, also fc… und fd…
+  if (h.startsWith('fc') || h.startsWith('fd')) return true
   // IPv4 in IPv6-Schreibweise, in beiden Formen.
   //
   // Die Punktform ist die, die man eintippt. Node normalisiert sie beim Parsen

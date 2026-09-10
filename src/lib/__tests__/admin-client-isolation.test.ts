@@ -150,15 +150,16 @@ describe('der service-role-Client bleibt unerreichbar', () => {
     }
   })
 
-  it('eine ausgenommene Datei prüft den Besitz, bevor sie den Worker ruft', () => {
-    // Die Ausnahme gilt nur unter dieser Bedingung. Vollständig prüfen kann
-    // das ein Import-Graph nicht — aber das Fehlen der Prüfung schon.
-    for (const { file } of PERMITTED) {
-      const source = readFileSync(resolve(SRC, file), 'utf8')
-      expect(source, `${file} ruft getUser() nicht auf`).toContain('getUser()')
-      expect(source, `${file} liest nichts über den RLS-Client`).toMatch(/createClient\(\)/)
-    }
-  })
+  // Dass die ausgenommene Datei ihre Bedingung auch einhält — Besitzprüfung
+  // vor dem Worker — lässt sich hier nicht feststellen. Ein Import-Graph
+  // kennt keine Reihenfolge. Zwei Zusicherungen der Form „irgendwo im
+  // Quelltext steht getUser()" standen hier und blieben grün, wenn die
+  // Prüfung entfernt oder nach dem Worker aufgerufen wird.
+  //
+  // Geprüft wird das stattdessen dort, wo es beobachtbar ist: in
+  // `ingest-route-guard.test.ts` wird die Route ausgeführt und festgestellt,
+  // dass `ingestSource` bei fehlender Anmeldung und bei fremder Quelle nicht
+  // aufgerufen wird.
 
   // Ein Sicherheitstest, der nicht rot werden kann, beweist nichts. Diese
   // Fälle prüfen den Prüfer — sie sind die Formen, an denen die erste Fassung

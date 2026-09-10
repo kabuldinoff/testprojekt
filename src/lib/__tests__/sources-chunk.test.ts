@@ -53,6 +53,16 @@ describe('chunkDocument · Größe', () => {
     expect(last.content.length).toBeGreaterThanOrEqual(MIN_CHARS)
   })
 
+  it('das Zusammenlegen des letzten Rests sprengt die Obergrenze nicht', () => {
+    // Der Fall aus dem Review: viel Text, dann Leerraum, dann ein einzelnes
+    // Zeichen. Der letzte Abschnitt schrumpft beim Trimmen unter MIN_CHARS,
+    // und blindes Zusammenlegen erzeugte einen Abschnitt über MAX_CHARS.
+    const text = 'x'.repeat(1600) + ' '.repeat(399) + 'a'
+    for (const c of chunkDocument([page(text)])) {
+      expect(c.content.length, `Abschnitt ${c.index}`).toBeLessThanOrEqual(MAX_CHARS)
+    }
+  })
+
   it('die Indizes laufen lückenlos ab 0', () => {
     const chunks = chunkDocument([page(prose(8000))])
     expect(chunks.map((c) => c.index)).toEqual(chunks.map((_, i) => i))
@@ -101,12 +111,21 @@ describe('chunkDocument · Trennstellen', () => {
   })
 
   it('trennt nicht mitten im Wort', () => {
-    const chunks = chunkDocument([page(prose(9000))])
+    // Geprüft wird die Grenze im ORIGINALTEXT, nicht das letzte Zeichen des
+    // Abschnitts. Die erste Fassung ließ `\w` zu — und ein mitten im Wort
+    // abgeschnittener Abschnitt endet ebenfalls auf `\w`. Der Test wäre grün
+    // geblieben, während die Funktion kaputt ist.
+    const text = prose(9000)
+    const chunks = chunkDocument([page(text)])
+
     for (const c of chunks.slice(0, -1)) {
-      const letzteZeichen = c.content.slice(-1)
-      // Ein Abschnitt endet auf Satzzeichen oder einem vollständigen Wort,
-      // nie auf einem abgeschnittenen Wortstück gefolgt von nichts.
-      expect(letzteZeichen).toMatch(/[.!?»"'\wäöüß)\]]/)
+      const davor = text[c.charEnd - 1] ?? ''
+      const danach = text[c.charEnd] ?? ''
+      const anGrenze = /\s/.test(davor) || /\s/.test(danach) || /[.!?]/.test(davor)
+      expect(
+        anGrenze,
+        `Abschnitt ${c.index} endet bei ${c.charEnd} zwischen ${JSON.stringify(davor)} und ${JSON.stringify(danach)}`
+      ).toBe(true)
     }
   })
 

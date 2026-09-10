@@ -6,7 +6,12 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Notice } from '@/components/ui/notice'
-import { MAX_FILE_BYTES, MAX_PASTE_CHARS, kindFromMime } from '@/lib/sources/schema'
+import {
+  MAX_FILE_BYTES,
+  MAX_PASTE_CHARS,
+  MAX_SOURCE_TITLE_CHARS,
+  classifyFile
+} from '@/lib/sources/schema'
 import { createClient } from '@/lib/supabase/client'
 
 /**
@@ -74,10 +79,14 @@ export function AddSource({ notebookId }: { notebookId: string }) {
           .uploadToSignedUrl(result.path, result.token, file)
 
         if (uploadError) {
-          // Die Zeile steht schon, die Datei fehlt. Die Verarbeitung würde
-          // daran scheitern und den Fehler anzeigen — aber es ist ehrlicher,
-          // ihn sofort zu nennen, statt den Nutzer auf einen Ladebalken
-          // schauen zu lassen, dessen Ausgang schon feststeht.
+          // Die Zeile steht schon, die Datei fehlt. Ohne Aufräumen bliebe eine
+          // unbrauchbare Quelle auf `pending` in der Liste stehen, und jeder
+          // erneute Versuch legte eine weitere daneben — bis die Grenze von 20
+          // erreicht ist, ohne dass je eine funktioniert hätte.
+          //
+          // Gelöscht wird über den RLS-Client: die Policy erlaubt nur eigene
+          // Quellen, ein fremder Datensatz wäre auch von hier aus unerreichbar.
+          await supabase.from('sources').delete().eq('id', result.sourceId)
           setError('Die Datei konnte nicht hochgeladen werden.')
           router.refresh()
           return
@@ -104,10 +113,22 @@ export function AddSource({ notebookId }: { notebookId: string }) {
     // einer 30-MB-Datei.
     if (file.size > MAX_FILE_BYTES) return setError('Die Datei ist größer als 10 MB.')
 
-    const kind = kindFromMime(file.type)
-    if (!kind) return setError('Nur PDF, Text und Markdown werden unterstützt.')
+    // Nicht nur `file.type`: Browser liefern für .md und je nach System auch
+    // für .txt eine leere Zeichenkette, und dann würde der Upload genau die
+    // Textdateien ablehnen, für die er gedacht ist.
+    const classified = classifyFile(file.name, file.type)
+    if (!classified) return setError('Nur PDF, Text und Markdown werden unterstützt.')
 
-    await submit({ kind, title: file.name.slice(0, 300), sizeBytes: file.size }, file)
+    await submit(
+      {
+        kind: classified.kind,
+        title: file.name.slice(0, MAX_SOURCE_TITLE_CHARS),
+        sizeBytes: file.size
+      },
+      // Mit kanonischem MIME-Typ neu verpackt: der Bucket prüft dagegen, und
+      // eine Datei mit leerem Typ würde er sonst zurückweisen.
+      new File([file], file.name, { type: classified.mime })
+    )
   }
 
   async function onUrl(event: React.FormEvent<HTMLFormElement>) {
@@ -225,7 +246,7 @@ export function AddSource({ notebookId }: { notebookId: string }) {
             label="Titel"
             name="title"
             required
-            maxLength={300}
+            maxLength={MAX_SOURCE_TITLE_CHARS}
             placeholder="Notizen aus der Sitzung"
           />
           <div className="flex flex-col gap-1.5">

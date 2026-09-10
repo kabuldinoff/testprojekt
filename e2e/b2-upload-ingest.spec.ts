@@ -33,10 +33,20 @@ async function registerAndOpenNotebook(page: Page, title = 'Quellen-Notebook') {
  */
 const addPanel = (page: Page) => page.getByRole('region', { name: 'Quelle hinzufügen' })
 
-/** Wartet, bis eine Quelle einen Endzustand erreicht hat. */
+/**
+ * Wartet, bis eine Quelle einen Endzustand erreicht hat.
+ *
+ * `data-status` ist der Haken zum Warten — er wechselt genau einmal und ist
+ * eindeutig. Geprüft wird danach aber die **sichtbare** Beschriftung: ein Test,
+ * der nur ein Attribut liest, bliebe grün, wenn die Anzeige etwas anderes sagt
+ * als der Zustand.
+ */
+const SICHTBAR = { ready: 'Bereit', failed: 'Fehlgeschlagen' } as const
+
 async function waitForStatus(page: Page, titleText: string, status: 'ready' | 'failed') {
-  const eintrag = page.locator('li', { hasText: titleText })
+  const eintrag = page.getByRole('listitem').filter({ hasText: titleText })
   await expect(eintrag).toHaveAttribute('data-status', status, { timeout: 30_000 })
+  await expect(eintrag).toContainText(SICHTBAR[status])
   return eintrag
 }
 
@@ -59,7 +69,6 @@ test('eingefügter Text wird verarbeitet und ist danach bereit', async ({ page }
   await panel.getByRole('button', { name: 'Hinzufügen' }).click()
 
   const eintrag = await waitForStatus(page, 'Sitzungsnotizen', 'ready')
-  await expect(eintrag).toContainText('Bereit')
   // Die Zeichenzahl steht erst nach der Verarbeitung fest — sie ist der
   // Beweis, dass der Text wirklich gelesen und nicht nur abgelegt wurde.
   await expect(eintrag).toContainText('Zeichen')
@@ -135,6 +144,15 @@ test('eine fremde Quelle lässt sich weder anlegen noch anstoßen', async ({
   const alicesEintrag = await waitForStatus(page, 'Alices Notizen', 'ready')
   await expect(alicesEintrag).toBeVisible()
 
+  // Die ID von Alices Quelle, um sie Mallory gleich unterzuschieben.
+  const alicesSourceId = await page.evaluate(() => {
+    const eintrag = [...document.querySelectorAll('li[data-status]')].find((li) =>
+      li.textContent?.includes('Alices Notizen')
+    )
+    return eintrag?.getAttribute('data-source-id') ?? null
+  })
+  expect(alicesSourceId, 'Alices Quellen-ID nicht gefunden').toBeTruthy()
+
   const context = await browser.newContext()
   const mallory = await context.newPage()
   await mallory.goto('/registrieren')
@@ -151,6 +169,12 @@ test('eine fremde Quelle lässt sich weder anlegen noch anstoßen', async ({
   // 404 und nicht 403: ein 403 bestätigte, dass es dieses Notebook gibt.
   expect(angelegt.status()).toBe(404)
 
+  // Und die Verarbeitung einer fremden Quelle lässt sich nicht anstoßen.
+  // Ohne diesen Aufruf hielte der Test nicht, was sein Name verspricht: die
+  // Route wäre nie berührt worden.
+  const angestossen = await mallory.request.post(`/api/sources/${alicesSourceId}/ingest`)
+  expect(angestossen.status()).toBe(404)
+
   await context.close()
 
   // Und Alices Abschnitte sind auch direkt über PostgREST nicht zu holen.
@@ -159,8 +183,32 @@ test('eine fremde Quelle lässt sich weder anlegen noch anstoßen', async ({
   // ersten Anlauf hatte ich dort danach gesucht.
   const apiContext = await playwright.request.newContext()
   const malloryDirekt = await createUser(apiContext, 'mallory-direkt')
-  const chunks = await asUser(apiContext, malloryDirekt).get('source_chunks?select=content')
+  const malloryApi = asUser(apiContext, malloryDirekt)
+
+  const chunks = await malloryApi.get('source_chunks?select=content')
   expect(chunks.status()).toBe(200)
   expect((await chunks.json()) as unknown[]).toEqual([])
+
+  // Leere Abschnitte allein beweisen nicht, dass auch die Metadaten privat
+  // sind. Titel, Adresse und Fehlermeldung einer Quelle verraten für sich
+  // genommen schon einiges.
+  const sources = await malloryApi.get('sources?select=title,source_url,error_message')
+  expect(sources.status()).toBe(200)
+  expect((await sources.json()) as unknown[]).toEqual([])
+
+  // Gegenprobe zur bewussten Entscheidung, für source_chunks keine
+  // Verbots-Policies zu schreiben: das grant vergibt nur select, also
+  // scheitert jeder Schreibversuch schon an der Rechteprüfung — selbst der
+  // des Besitzers.
+  const eingefuegt = await malloryApi.post('source_chunks', {
+    source_id: alicesSourceId,
+    notebook_id: notebookId,
+    chunk_index: 0,
+    content: 'untergeschoben',
+    char_start: 0,
+    char_end: 14
+  })
+  expect(eingefuegt.ok(), await eingefuegt.text()).toBe(false)
+
   await apiContext.dispose()
 })

@@ -66,13 +66,25 @@ describe('checkExternalUrl · private Netze und Cloud-Metadaten', () => {
     ['192.168', 'http://192.168.1.1/'],
     ['Carrier-Grade NAT', 'http://100.64.0.1/'],
     ['IPv6 unique local (fd)', 'http://[fd00::1]/'],
-    ['IPv6 link-local', 'http://[fe80::1]/'],
+    ['IPv6 link-local fe80', 'http://[fe80::1]/'],
+    // Link-local ist fe80::/10 und nicht fe80::/16. Die erste Fassung prüfte
+    // auf das Präfix und ließ diese beiden durch.
+    ['IPv6 link-local fe90', 'http://[fe90::1]/'],
+    ['IPv6 link-local febf', 'http://[febf::1]/'],
+    ['IPv6 site-local (abgekündigt)', 'http://[fec0::1]/'],
     // Der bekannteste SSRF-Fall überhaupt: der Metadatendienst liefert
     // Zugangsdaten der Ausführungsumgebung.
     ['Cloud-Metadaten über IP', 'http://169.254.169.254/latest/meta-data/'],
     ['Cloud-Metadaten über Namen', 'http://metadata.google.internal/']
   ])('%s wird abgelehnt', (_name, url) => {
     expect(checkExternalUrl(url).ok, `${url} kam durch`).toBe(false)
+  })
+
+  it('öffentliche IPv6-Adressen bleiben erlaubt', () => {
+    // Die /10-Maske darf nicht zu grob greifen: 2001:db8:: ist Dokumentation,
+    // aber technisch öffentlich adressierbar und kein Sonderfall der Sperre.
+    expect(checkExternalUrl('http://[2001:db8::1]/').ok).toBe(true)
+    expect(checkExternalUrl('http://[2606:4700::1]/').ok).toBe(true)
   })
 
   it('172.15 und 172.32 sind öffentlich und bleiben erlaubt', () => {
