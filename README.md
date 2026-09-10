@@ -20,6 +20,7 @@ Built with **Next.js 16, TypeScript and Supabase**.
 | `supabase/migrations/`     | Hand-written SQL. Every policy and index carries its reason.                                                |
 | `design/`                  | The design canvas. Open `design/canvas.html` in a browser.                                                  |
 | `docs/adr/`                | Why things are the way they are, including what was deliberately left out.                                  |
+| `docs/deployment.md`       | How code and schema reach production — on deliberately separate paths.                                      |
 
 ## Getting started
 

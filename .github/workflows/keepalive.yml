@@ -10,8 +10,9 @@ name: Keepalive
 #   2. Dieser Workflow — ein echter externer HTTP-Request, und damit
 #      unzweifelhaft "user database activity" im Sinne von Supabase.
 #
-# ⚠️ GitHub deaktiviert geplante Workflows in ÖFFENTLICHEN Repositories nach
-# 60 Tagen ohne Repo-Aktivität. Wenn dieser Lauf still verschwindet, ist das der
+# ⚠️ GitHub deaktiviert geplante Workflows in öffentlichen Repositories nach
+# 60 Tagen ohne Repo-Aktivität. Dieses Repository IST öffentlich (docs/adr/0005),
+# die Regel greift hier also. Wenn dieser Lauf still verschwindet, ist das der
 # Grund — im Actions-Tab wieder einschalten.
 
 on:

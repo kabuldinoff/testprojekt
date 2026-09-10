@@ -56,7 +56,17 @@ Datei hier ergänzt die Projektregeln.
   entstanden vor der ersten Komponente. Bewusst **nicht** gitignoriert.
 - **`docs/adr/`** — jede Entscheidung, die jemand hinterfragen könnte, mit Kontext, Alternativen
   und Konsequenzen. Eine bewusste Nicht-Entscheidung gehört genauso hinein.
+- **`docs/deployment.md`** — wie Code und Schema in Produktion kommen, und warum auf
+  **verschiedenen Wegen**: Vercel baut automatisch aus `main`, das Schema geht ausschließlich
+  von Hand per `supabase db push` raus. Die Supabase-GitHub-Integration ist bewusst nicht
+  verbunden. Ein Deploy ist zurücknehmbar, eine Migration nicht — was automatisch läuft, läuft
+  auch nachts um zwei.
 - **`_intern/`** — gitignoriert, gehört nicht zur Abgabe. Nie in den Index aufnehmen.
+
+**Das Repository ist öffentlich** (`docs/adr/0005`). Alles hier ist lesbar, die Historie
+eingeschlossen — was einmal in einem Commit stand, bleibt über die Events-API und über Forks
+abrufbar, auch nach einem Force-Push. Deshalb prüft `no-secrets.sh` vor einem Push auch den
+ausgehenden Commit-Bereich und nicht nur den Arbeitsbaum.
 
 ## Befehle
 
