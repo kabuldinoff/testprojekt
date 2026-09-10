@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <span className="hidden text-sm text-muted-ink sm:inline">{user.email}</span>
         <ThemeToggle />
         <form action={signOut}>
-          <Button type="submit" variant="ghost" className="px-3 py-1.5 text-sm">
+          <Button type="submit" variant="ghost" size="compact">
             Abmelden
           </Button>
         </form>
