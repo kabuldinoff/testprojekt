@@ -31,6 +31,56 @@ esac
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root" || exit 0
 
+# Der Bereich unten wird aus HEAD abgeleitet. Das stimmt für `git push` und
+# `git push origin <branch>`, aber nicht für jede Form: `git push --all`,
+# `--tags`, `--mirror` oder ein Refspec wie `origin release:main` schicken
+# etwas anderes los, als HEAD vermuten lässt. Die Einschätzung wäre dann
+# schlicht falsch — und eine falsche Entwarnung ist schlechter als keine.
+#
+# Diese Fälle vollständig aufzulösen wäre viel Logik für Befehle, die hier
+# praktisch nicht vorkommen. Stattdessen wird zugegeben, dass die Einschätzung
+# nicht möglich ist, und unbedingt nachgefragt.
+if [ -z "${IMPACT_RANGE_OVERRIDE:-}" ]; then
+  unresolvable=""
+  case "$cmd" in
+    *" --all"*|*" --tags"*|*" --mirror"*) unresolvable="Sammel-Push (--all, --tags oder --mirror)" ;;
+  esac
+
+  # Ein Push an eine ausgeschriebene URL statt an einen konfigurierten Remote.
+  # Eigener Fall, nicht nur ein Sonderfall des Refspecs: hier ist nicht bloß
+  # unklar, WAS rausgeht, sondern auch WOHIN.
+  if [ -z "$unresolvable" ] && printf '%s' "$cmd" | grep -qE '[a-zA-Z][a-zA-Z0-9+.-]*://'; then
+    unresolvable="Push an eine ausgeschriebene URL statt an einen konfigurierten Remote"
+  fi
+
+  # Ein Refspec der Form <quelle>:<ziel>. URLs sind oben schon abgefangen und
+  # werden hier entfernt, sonst liest sich "https://…" als Refspec.
+  if [ -z "$unresolvable" ]; then
+    cmd_ohne_urls=$(printf '%s' "$cmd" | sed -E 's#[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]*##g')
+    if printf '%s' "$cmd_ohne_urls" | grep -qE 'git push[^|;&]*[[:space:]][^[:space:]:/]+:[^[:space:]]+'; then
+      unresolvable="expliziter Refspec (<quelle>:<ziel>)"
+    fi
+  fi
+
+  if [ -n "$unresolvable" ]; then
+    reason="Dieser Push lässt sich nicht zuverlässig einschätzen: $unresolvable.
+
+Der Hook leitet die Tragweite aus HEAD ab. Bei dieser Befehlsform geht etwas
+anderes raus als HEAD, die Einschätzung wäre also falsch — und eine falsche
+Entwarnung ist schlechter als gar keine.
+
+Bitte selbst prüfen, was tatsächlich hochgeht, und dann bestätigen."
+    jq -n --arg r "$reason" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "ask",
+        permissionDecisionReason: $r
+      }
+    }'
+    exit 0
+  fi
+fi
+
 range=${IMPACT_RANGE_OVERRIDE:-}
 if [ -z "$range" ]; then
   if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then

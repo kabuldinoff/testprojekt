@@ -14,12 +14,19 @@
 # einer versehentlich angelegten Datei fällt gar nicht darunter.
 #
 # Verhalten: blockiert nur bei einem Treffer, und nur bei git add/commit/push.
+# Bei `git add` und `git commit` wird der Arbeitsbaum geprüft, bei `git push`
+# zusätzlich der ausgehende Commit-Bereich — sonst entginge dem Hook genau der
+# Fall, für den er da ist.
+#
 # Bei allem Unerwarteten exit 0 — ein Hook, der die Sitzung lahmlegt, wird
 # abgeschaltet und schützt dann gar nichts mehr.
 #
 # Von Hand testen:
 #   echo '{"tool_name":"Bash","tool_input":{"command":"git add ."}}' \
 #     | sh .claude/hooks/no-secrets.sh
+#   SECRETS_RANGE_OVERRIDE=HEAD~1..HEAD \
+#     echo '{"tool_name":"Bash","tool_input":{"command":"git push"}}' \
+#       | sh .claude/hooks/no-secrets.sh
 # ─────────────────────────────────────────────────────────────────────────────
 set -eu
 
@@ -40,20 +47,49 @@ cd "$root" || exit 0
 
 findings=""
 
-# Was würde tatsächlich hochgeladen? Gestaged plus nicht gestaged, gegen HEAD.
+# Der Arbeitsbaum: gestaged, nicht gestaged, ungetrackt. Das ist das, was bei
+# `git add` und `git commit` zur Debatte steht.
 staged=$(git diff --cached --name-only 2>/dev/null || true)
 unstaged=$(git diff --name-only 2>/dev/null || true)
 untracked=$(git ls-files --others --exclude-standard 2>/dev/null || true)
 candidates=$(printf '%s\n%s\n%s\n' "$staged" "$unstaged" "$untracked" | sed '/^$/d' | sort -u)
 
+content=$(git diff HEAD 2>/dev/null || true)
+
+# Bei `git push` reicht der Arbeitsbaum NICHT. Was hochgeht, sind die Commits
+# zwischen Upstream und HEAD — und die stehen bei sauberem Arbeitsbaum in
+# keinem der obigen Diffs. Ein Schlüssel, der vor zwei Commits hineingeraten
+# ist, käme also unbemerkt durch, ausgerechnet bei dem Befehl, der ihn
+# unwiderruflich veröffentlicht.
+case "$cmd" in
+  *"git push"*)
+    range=${SECRETS_RANGE_OVERRIDE:-}
+    if [ -z "$range" ]; then
+      if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+        range='@{upstream}..HEAD'
+      else
+        # Kein Upstream: der Branch geht zum ersten Mal raus. Dann ist alles
+        # seit dem Abzweig von main neu.
+        base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+        [ -n "$base" ] && range="$base..HEAD"
+      fi
+    fi
+    if [ -n "$range" ]; then
+      outgoing=$(git diff --name-only "$range" 2>/dev/null || true)
+      candidates=$(printf '%s\n%s\n' "$candidates" "$outgoing" | sed '/^$/d' | sort -u)
+      content="$content
+$(git diff "$range" 2>/dev/null || true)"
+    fi
+    ;;
+esac
+
 # 1. Private Ordner — auch wenn jemand die .gitignore mit -f übergangen hat.
 leaked=$(printf '%s\n' "$candidates" | grep -E '^_intern/' || true)
-[ -n "$leaked" ] && findings="${findings}Dateien aus _intern/ im Arbeitsbaum-Diff:
+[ -n "$leaked" ] && findings="${findings}Dateien aus _intern/:
 $leaked
 "
 
 # 2. Key-Muster im tatsächlichen Inhalt.
-content=$(git diff HEAD 2>/dev/null || true)
 for f in $untracked; do
   [ -f "$f" ] && [ "$(wc -c <"$f")" -lt 2000000 ] && content="$content
 $(cat "$f" 2>/dev/null || true)"
