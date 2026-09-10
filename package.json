@@ -26,9 +26,13 @@
     "supabase:reset": "supabase db reset"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.67",
+    "@ai-sdk/mistral": "^4.0.42",
+    "@ai-sdk/react": "^4.0.100",
     "@mozilla/readability": "^0.6.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "ai": "^7.0.97",
     "linkedom": "^0.18.13",
     "next": "16.3.4",
     "next-themes": "^0.4.6",

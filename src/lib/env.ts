@@ -77,3 +77,41 @@ export function serverEnv() {
     supabaseSecretKey: required('SUPABASE_SECRET_KEY', process.env.SUPABASE_SECRET_KEY)
   } as const
 }
+
+/**
+ * Zugangsdaten und Modell-IDs der AI-Anbieter. Nur auf dem Server.
+ *
+ * Die Modell-IDs stehen in der Umgebung und nicht im Code, und das ist
+ * nachgemessen statt vorsichtshalber: `gemini-2.5-flash` — das ursprünglich
+ * vorgesehene Modell — antwortet einem frisch erzeugten Schlüssel mit
+ * `404 no longer available to new users`, obwohl es weiterhin in der
+ * Modellliste des Kontos steht. Die Liste sagt also nicht, was der eigene
+ * Schlüssel benutzen darf; nur der Aufruf sagt es. Ein fest verdrahteter
+ * String wäre ein Deploy, eine Variable ist ein Neustart.
+ *
+ * Bewusst keine `-latest`-Aliasse: die verschieben sich unter einem laufenden
+ * Produkt, und dann ändert sich das Antwortverhalten ohne einen Commit.
+ */
+export function aiEnv() {
+  return {
+    googleApiKey: required(
+      'GOOGLE_GENERATIVE_AI_API_KEY',
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    ),
+    mistralApiKey: required('MISTRAL_API_KEY', process.env.MISTRAL_API_KEY),
+    googleChatModel: required('GEMINI_CHAT_MODEL', process.env.GEMINI_CHAT_MODEL),
+    mistralChatModel: required('MISTRAL_CHAT_MODEL', process.env.MISTRAL_CHAT_MODEL),
+
+    // Die Naht für die End-to-End-Tests. Im Betrieb nicht gesetzt, dann gilt
+    // die Voreinstellung des jeweiligen SDK.
+    //
+    // Gegen die echten Anbieter zu testen ginge nicht: ein Modell formuliert
+    // jedes Mal anders, und dann lässt sich prüfen, dass *irgendetwas* kam —
+    // nicht, dass Beleg [1] auf den richtigen Ausschnitt zeigt. Genau das ist
+    // aber die Eigenschaft, an der dieses Produkt hängt. Dazu käme, dass
+    // jeder CI-Lauf echtes Kontingent verbrauchte und echte Schlüssel in
+    // einem öffentlichen Repo lägen. Siehe scripts/ai-stub.mjs.
+    googleBaseUrl: process.env.GOOGLE_BASE_URL,
+    mistralBaseUrl: process.env.MISTRAL_BASE_URL
+  } as const
+}

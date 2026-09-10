@@ -1,3 +1,5 @@
+import { EMBEDDING_MODEL, embedChunks } from '@/lib/llm/embeddings'
+import { logLlmCall } from '@/lib/llm/usage'
 import { createAdminClientAfterOwnershipCheck } from '@/lib/supabase/admin'
 
 import { chunkDocument, hasUsableText, type Page } from './chunk'
@@ -189,6 +191,57 @@ export async function ingestSource(sourceId: string): Promise<IngestOutcome> {
 
   const chunks = chunkDocument(pages)
 
+  // Der Besitzer für das Verbrauchsprotokoll. Ein eigener Zugriff, weil
+  // `claim_source` ihn nicht mitliefert — und eine bereits angewandte
+  // Migration wird nicht nachträglich umgeschrieben, sondern ergänzt. Für
+  // eine Spalte, die einmal pro Lauf gebraucht wird, ist ein Zugriff der
+  // günstigere Preis als eine Funktion, die es in zwei Fassungen gibt.
+  const { data: notebook } = await admin
+    .from('notebooks')
+    .select('owner_id')
+    .eq('id', source.notebook_id)
+    .maybeSingle<{ owner_id: string }>()
+
+  // ── Einbetten, bevor geschrieben wird ────────────────────────────────────
+  //
+  // Die Reihenfolge ist die Zusicherung: `source_chunks.embedding` ist
+  // `not null`, ein Abschnitt kann also gar nicht ohne Vektor entstehen.
+  // Andersherum — erst schreiben, dann einbetten — gäbe es zwischen beiden
+  // Schritten einen Zustand, in dem Abschnitte existieren und unauffindbar
+  // sind. Bricht der Lauf genau dort ab, stünde die Quelle auf „bereit" und
+  // fände nichts.
+  let vectors: number[][]
+  const embedBegonnen = Date.now()
+  try {
+    const ergebnis = await embedChunks(chunks.map((c) => c.content))
+    vectors = ergebnis.vectors
+
+    // Ohne Besitzer kein Protokolleintrag: `llm_calls.user_id` ist ein
+    // Fremdschlüssel, ein Platzhalter liefe in einen Constraint-Fehler und
+    // verwandelte eine fehlende Statistik in eine Fehlermeldung.
+    if (notebook) {
+      await logLlmCall(admin, {
+        userId: notebook.owner_id,
+        notebookId: source.notebook_id,
+        kind: 'embed',
+        provider: 'mistral',
+        model: EMBEDDING_MODEL,
+        inputTokens: ergebnis.tokens,
+        outputTokens: 0,
+        durationMs: Date.now() - embedBegonnen
+      })
+    }
+  } catch (error) {
+    // Vorübergehend: ein erschöpftes Kontingent oder ein Netzfehler geht
+    // vorbei, und der Reaper nimmt die Quelle in wenigen Minuten erneut auf.
+    // Ein dauerhaft falsch konfigurierter Schlüssel läuft dagegen in
+    // MAX_ATTEMPTS und endet mit einer Meldung statt in einer Schleife.
+    console.error(`[ingest] Einbetten fehlgeschlagen für ${sourceId}`, error)
+    const message = 'Die Quelle konnte nicht für die Suche aufbereitet werden.'
+    await fail(admin, sourceId, message, source.attempts, false)
+    return { status: 'failed', message }
+  }
+
   // Erst löschen, dann schreiben. Ohne das liefe ein zweiter Versuch in die
   // Eindeutigkeitsbedingung auf (source_id, chunk_index).
   const { error: deleteError } = await admin
@@ -207,14 +260,16 @@ export async function ingestSource(sourceId: string): Promise<IngestOutcome> {
   }
 
   const { error: insertError } = await admin.from('source_chunks').insert(
-    chunks.map((c) => ({
+    chunks.map((c, i) => ({
       source_id: sourceId,
       notebook_id: source.notebook_id,
       chunk_index: c.index,
       content: c.content,
       page_number: c.pageNumber,
       char_start: c.charStart,
-      char_end: c.charEnd
+      char_end: c.charEnd,
+      // Gleiche Reihenfolge wie die Eingabe — `embedMany` sichert das zu.
+      embedding: JSON.stringify(vectors[i])
     }))
   )
 
