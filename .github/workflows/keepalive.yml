@@ -19,9 +19,17 @@ on:
     - cron: '17 4 */2 * *' # alle zwei Tage; 17 nach, um die volle Stunde zu meiden
   workflow_dispatch:
 
+# Dieser Lauf schickt genau einen HTTP-Request. Er braucht kein Token mit
+# Schreibrechten auf das Repository.
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest
+    # Ein Request, der eine Minute nicht schafft, schafft es auch in sechs
+    # Stunden nicht — und so lange liefe der Job ohne diese Grenze.
+    timeout-minutes: 5
     steps:
       - name: Datenbank anstupsen
         env:
@@ -33,7 +41,10 @@ jobs:
             exit 0
           fi
           # heartbeat ist eine winzige Tabelle, die nur zu diesem Zweck existiert.
-          code=$(curl -s -o /dev/null -w '%{http_code}' \
+          # Beide Zeitgrenzen sind nötig: --connect-timeout deckt den Fall ab,
+          # dass die Gegenstelle nicht antwortet, --max-time den, dass sie die
+          # Verbindung annimmt und dann hängen lässt.
+          code=$(curl -sS --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
             -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
             "$URL/rest/v1/heartbeat?select=at&limit=1")
           echo "HTTP $code"
