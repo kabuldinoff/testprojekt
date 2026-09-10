@@ -6,12 +6,13 @@ Prüfpunkt zugeordnet werden kann.
 
 ## Automatisiert
 
-| ID  | Datei                          | Prüft                                                                                                                                                                                 |
-| --- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a0  | `e2e/a0-foundation.spec.ts`    | Dark ist Default ohne Blitz, Umschalter in beide Richtungen, Wahl überlebt Reload, selbst gehostete Schriften kommen an                                                               |
-| a1  | `e2e/a1-auth.spec.ts`          | Registrierung, Anmeldung, Abmeldung; geschützter Bereich leitet mit Rückweg um; falsche Zugangsdaten verraten nicht, ob das Konto existiert                                           |
-| a2  | `e2e/a2-rls-isolation.spec.ts` | Mandantentrennung, direkt gegen PostgREST mit gültigem Fremdtoken: lesen, ändern, löschen, unterschieben — alles wirkungslos. Plus die Gegenprobe, dass `heartbeat` bewusst offen ist |
-| b1  | `e2e/b1-notebook-crud.spec.ts` | Anlegen aus dem Leerzustand, Titel aus Leerraum abgelehnt, Umbenennen wirkt in Detail und Liste, Löschen braucht einen zweiten Schritt, fremdes Notebook ergibt **404**               |
+| ID  | Datei                          | Prüft                                                                                                                                                                                                                                     |
+| --- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a0  | `e2e/a0-foundation.spec.ts`    | Dark ist Default ohne Blitz, Umschalter in beide Richtungen, Wahl überlebt Reload, selbst gehostete Schriften kommen an                                                                                                                   |
+| a1  | `e2e/a1-auth.spec.ts`          | Registrierung, Anmeldung, Abmeldung; geschützter Bereich leitet mit Rückweg um; falsche Zugangsdaten verraten nicht, ob das Konto existiert                                                                                               |
+| a2  | `e2e/a2-rls-isolation.spec.ts` | Mandantentrennung, direkt gegen PostgREST mit gültigem Fremdtoken: lesen, ändern, löschen, unterschieben — alles wirkungslos. Plus die Gegenprobe, dass `heartbeat` bewusst offen ist                                                     |
+| b1  | `e2e/b1-notebook-crud.spec.ts` | Anlegen aus dem Leerzustand, Titel aus Leerraum abgelehnt, Umbenennen wirkt in Detail und Liste, Löschen braucht einen zweiten Schritt, fremdes Notebook ergibt **404**                                                                   |
+| b2  | `e2e/b2-upload-ingest.spec.ts` | Eingefügter Text und hochgeladene Datei laufen bis `bereit` durch; ein unlesbares PDF scheitert **sofort** statt nach drei Versuchen; eine Adresse im lokalen Netz wird abgelehnt; eine fremde Quelle lässt sich weder anlegen noch lesen |
 
 Geplant, in der Reihenfolge der Umsetzung: `b2-upload-ingest`, `b3-chat-citations`, `b4-audio-overview`, `c1-responsive`, `c2-a11y`,
 `d1-landing-seo`, `d2-design-tokens`.

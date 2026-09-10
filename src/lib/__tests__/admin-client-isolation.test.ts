@@ -37,6 +37,30 @@ const ADMIN = resolve(SRC, 'lib/supabase/admin.ts')
 /** Wurzeln, aus denen `admin.ts` unerreichbar bleiben muss. */
 const FORBIDDEN_ROOTS = ['app']
 
+/**
+ * Die einzigen Dateien unter `src/app/`, die `admin.ts` erreichen dürfen.
+ *
+ * Wichtig ist die Art der Ausnahme. Eine frühere Fassung hatte eine
+ * Ausnahmeliste, die die **Suche abbrach** — damit galt jeder Weg durch einen
+ * ausgenommenen Ordner als unbedenklich, und genau das war die Lücke. Hier
+ * werden stattdessen **Einstiegspunkte** benannt: diese Datei darf, jede
+ * andere nicht, und indirekte Wege werden weiterhin vollständig verfolgt.
+ *
+ * Die Liste wird unten selbst geprüft. Ein zusätzlicher Eintrag ist damit
+ * eine sichtbare Änderung an einem Test und keine stille Erweiterung.
+ */
+const PERMITTED: Array<{ file: string; reason: string }> = [
+  {
+    file: 'app/api/sources/[sourceId]/ingest/route.ts',
+    reason:
+      'Die Verarbeitung läuft in after(), also nach der Antwort. Dort ist der Request beendet ' +
+      'und das Sitzungs-Token kann während eines bis zu fünf Minuten langen Laufs ablaufen. ' +
+      'Die Route prüft den Besitz vorher über den RLS-Client; erst danach übernimmt der Worker.'
+  }
+]
+
+const PERMITTED_FILES = new Set(PERMITTED.map((p) => resolve(SRC, p.file)))
+
 function listFiles(dir: string): string[] {
   let out: string[] = []
   for (const entry of readdirSync(dir)) {
@@ -107,6 +131,7 @@ describe('der service-role-Client bleibt unerreichbar', () => {
   for (const root of FORBIDDEN_ROOTS) {
     it(`keine Datei unter src/${root}/ erreicht admin.ts`, () => {
       const offenders = listFiles(resolve(SRC, root))
+        .filter((entry) => !PERMITTED_FILES.has(entry))
         .map((entry) => pathToAdmin(entry))
         .filter((chain): chain is string[] => chain !== null)
         .map((chain) => `\n  ${chain.map((f) => relative(process.cwd(), f)).join('\n    → ')}`)
@@ -114,6 +139,27 @@ describe('der service-role-Client bleibt unerreichbar', () => {
       expect(offenders, `admin.ts ist erreichbar über:${offenders.join('')}`).toEqual([])
     })
   }
+
+  it('die Ausnahmeliste enthält genau das, was sie enthalten soll', () => {
+    // Damit das Hinzufügen einer Ausnahme eine bewusste Änderung an zwei
+    // Stellen ist und nicht nur ein stiller Eintrag in einer Liste.
+    expect(PERMITTED.map((p) => p.file)).toEqual(['app/api/sources/[sourceId]/ingest/route.ts'])
+    for (const { file, reason } of PERMITTED) {
+      expect(statSync(resolve(SRC, file)).isFile(), `${file} existiert nicht mehr`).toBe(true)
+      expect(reason.length, `${file} hat keine Begründung`).toBeGreaterThan(60)
+    }
+  })
+
+  // Dass die ausgenommene Datei ihre Bedingung auch einhält — Besitzprüfung
+  // vor dem Worker — lässt sich hier nicht feststellen. Ein Import-Graph
+  // kennt keine Reihenfolge. Zwei Zusicherungen der Form „irgendwo im
+  // Quelltext steht getUser()" standen hier und blieben grün, wenn die
+  // Prüfung entfernt oder nach dem Worker aufgerufen wird.
+  //
+  // Geprüft wird das stattdessen dort, wo es beobachtbar ist: in
+  // `ingest-route-guard.test.ts` wird die Route ausgeführt und festgestellt,
+  // dass `ingestSource` bei fehlender Anmeldung und bei fremder Quelle nicht
+  // aufgerufen wird.
 
   // Ein Sicherheitstest, der nicht rot werden kann, beweist nichts. Diese
   // Fälle prüfen den Prüfer — sie sind die Formen, an denen die erste Fassung
