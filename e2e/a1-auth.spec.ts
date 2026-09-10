@@ -52,20 +52,39 @@ test('Anmeldung, Abmeldung, und danach ist der Bereich wieder zu', async ({ page
   await expect(page).toHaveURL(/\/anmelden/)
 })
 
-test('falsche Zugangsdaten verraten nicht, ob das Konto existiert', async ({ page }) => {
-  await page.goto('/anmelden')
-  await page.getByLabel('E-Mail-Adresse').fill('gibtesnicht@beispiel.test')
-  await page.getByLabel('Passwort').fill('falsches-passwort-123')
-  await page.getByRole('button', { name: 'Anmelden' }).click()
-
+test('beide Anmeldefehler sehen identisch aus', async ({ page }) => {
   // Innerhalb des Formulars suchen: Next rendert für Routenansagen einen
   // eigenen role="alert"-Container, und ein ungebundenes getByRole trifft beide.
-  const alert = page.locator('form').getByRole('alert')
-  await expect(alert).toBeVisible()
-  // Dieselbe Meldung wie bei einem existierenden Konto mit falschem Passwort.
-  // Eine Unterscheidung wäre freundlicher, verriete aber, welche Adressen
-  // registriert sind.
-  await expect(alert).toHaveText('E-Mail-Adresse oder Passwort stimmt nicht.')
+  const meldung = () => page.locator('form').getByRole('alert')
+
+  const versuch = async (email: string, passwort: string) => {
+    await page.goto('/anmelden')
+    await page.getByLabel('E-Mail-Adresse').fill(email)
+    await page.getByLabel('Passwort').fill(passwort)
+    await page.getByRole('button', { name: 'Anmelden' }).click()
+    await expect(meldung()).toBeVisible()
+    return meldung().textContent()
+  }
+
+  // Ein echtes Konto anlegen, damit der zweite Fall auch wirklich "Konto
+  // existiert, Passwort falsch" ist und nicht wieder "Konto existiert nicht".
+  const vorhanden = uniqueEmail('vorhanden')
+  await page.goto('/registrieren')
+  await page.getByLabel('E-Mail-Adresse').fill(vorhanden)
+  await page.getByLabel('Passwort').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Konto anlegen' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+  await page.getByRole('button', { name: 'Abmelden' }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  const unbekannt = await versuch('gibtesnicht@beispiel.test', 'falsches-passwort-123')
+  const falschesPasswort = await versuch(vorhanden, 'ganz-anderes-passwort-9')
+
+  // Der eigentliche Punkt: Ein Unterschied zwischen beiden Meldungen wäre eine
+  // Auskunft darüber, welche Adressen registriert sind. Nur einen der beiden
+  // Fälle zu prüfen — so stand es hier vorher — beweist das nicht.
+  expect(unbekannt).toBe('E-Mail-Adresse oder Passwort stimmt nicht.')
+  expect(falschesPasswort).toBe(unbekannt)
 })
 
 test('ein angemeldeter Nutzer wird von der Anmeldeseite weggeleitet', async ({ page }) => {

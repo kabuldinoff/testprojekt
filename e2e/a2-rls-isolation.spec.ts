@@ -74,10 +74,32 @@ test('Mallory kann Alices Notebook nicht ändern', async ({ request }) => {
 })
 
 test('Mallory kann Alices Notebook nicht löschen', async ({ request }) => {
-  await asUser(request, mallory).delete(`notebooks?id=eq.${aliceNotebookId}`)
+  const response = await asUser(request, mallory).delete(`notebooks?id=eq.${aliceNotebookId}`)
+
+  // Den Status mitprüfen, nicht nur das Überleben der Zeile: liefe der
+  // Endpunkt in einen 500, bliebe die Zeile ebenfalls stehen — der Test wäre
+  // grün und hätte über RLS nichts ausgesagt.
+  expect(response.status(), await response.text()).toBe(204)
 
   const check = await asUser(request, alice).get(`notebooks?id=eq.${aliceNotebookId}`)
   expect((await check.json()) as unknown[]).toHaveLength(1)
+})
+
+test('Alice kann ihr eigenes Notebook löschen — die Gegenprobe', async ({ request }) => {
+  // Ohne diese Gegenprobe wäre der Test darüber auch dann grün, wenn Löschen
+  // für alle gesperrt ist. Dann hätte er nicht Mandantentrennung gezeigt,
+  // sondern eine fehlende Policy.
+  const created = await asUser(request, alice).post('notebooks', {
+    owner_id: alice.userId,
+    title: 'Zum Löschen'
+  })
+  const [row] = (await created.json()) as Array<{ id: string }>
+
+  const response = await asUser(request, alice).delete(`notebooks?id=eq.${row!.id}`)
+  expect(response.status()).toBe(204)
+
+  const check = await asUser(request, alice).get(`notebooks?id=eq.${row!.id}`)
+  expect((await check.json()) as unknown[]).toEqual([])
 })
 
 test('Mallory kann kein Notebook in Alices Namen anlegen', async ({ request }) => {

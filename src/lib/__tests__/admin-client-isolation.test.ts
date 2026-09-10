@@ -1,29 +1,41 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /**
  * Die wichtigste Sicherheitsregel des Projekts, als Test statt als Kommentar.
  *
  * `src/lib/supabase/admin.ts` benutzt den Secret Key und umgeht RLS
- * vollständig. Er darf ausschließlich aus dem Ingestion-Worker erreichbar
- * sein, nie aus einer Route, die direkt auf eine Nutzeraktion antwortet.
+ * vollständig. Aus einer Route, die direkt auf eine Nutzeraktion antwortet,
+ * darf er nicht erreichbar sein — auch nicht über mehrere Ebenen.
  *
- * Ein Kommentar hält diese Regel nicht — ein Import ist schnell geschrieben
- * und im Diff unauffällig. Dieser Test folgt dem Import-Graph vom App-Bereich
- * aus und schlägt fehl, sobald `admin.ts` von dort aus erreichbar wird, auch
- * über mehrere Ebenen.
+ * Ein Kommentar hält diese Regel nicht: ein Import ist schnell geschrieben und
+ * im Diff unauffällig. Dieser Test folgt dem Import-Graph und schlägt fehl,
+ * sobald `admin.ts` von `src/app/` aus erreichbar wird. Die Fehlermeldung
+ * zeigt die vollständige Kette.
+ *
+ * Die erste Fassung benutzte eine Regex auf `from '…'`. Sie übersah drei
+ * Formen, mit denen sich die Regel lautlos umgehen ließ:
+ *   import '@/lib/x'            — Seiteneffekt-Import ohne Bindung
+ *   await import('@/lib/x')     — dynamischer Import
+ *   export * from '@/lib/x'     — Re-Export
+ * `ts.preProcessFile` erkennt alle. TypeScript liegt ohnehin als
+ * Entwicklungsabhängigkeit vor, es kommt also nichts Neues dazu.
+ *
+ * Ebenfalls aus der ersten Fassung entfernt: eine Ausnahmeliste, die die Suche
+ * beim Ingestion-Ordner abbrach. Damit galt ein Weg
+ * `src/app/… → src/lib/ingest/… → admin.ts` als unbedenklich — dabei ist genau
+ * das der Verstoß, um den es geht. Wo `admin.ts` legitim benutzt werden darf,
+ * entscheidet nicht dieser Test, sondern von wo aus man dorthin gelangt.
  */
 
 const SRC = resolve(process.cwd(), 'src')
 const ADMIN = resolve(SRC, 'lib/supabase/admin.ts')
 
-/** Verzeichnisse, aus denen admin.ts nicht erreichbar sein darf. */
+/** Wurzeln, aus denen `admin.ts` unerreichbar bleiben muss. */
 const FORBIDDEN_ROOTS = ['app']
-
-/** Der einzige Ort, an dem der Import erlaubt ist. Existiert noch nicht. */
-const ALLOWED = [resolve(SRC, 'lib/ingest')]
 
 function listFiles(dir: string): string[] {
   let out: string[] = []
@@ -35,7 +47,7 @@ function listFiles(dir: string): string[] {
   return out
 }
 
-/** Löst einen Import-Spezifier auf eine Datei unter src/ auf, sonst null. */
+/** Löst einen Import-Spezifier auf eine Datei unter `src/` auf, sonst null. */
 function resolveImport(fromFile: string, specifier: string): string | null {
   let base: string
   if (specifier.startsWith('@/')) base = resolve(SRC, specifier.slice(2))
@@ -60,11 +72,15 @@ function resolveImport(fromFile: string, specifier: string): string | null {
 
 function importsOf(file: string): string[] {
   const source = readFileSync(file, 'utf8')
-  const specifiers = [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]!)
-  return specifiers.map((s) => resolveImport(file, s)).filter((f): f is string => f !== null)
+  // Argumente: readImportFiles, detectJavaScriptImports — zusammen erfassen
+  // sie statische, dynamische, Seiteneffekt- und Re-Export-Importe.
+  const { importedFiles } = ts.preProcessFile(source, true, true)
+  return importedFiles
+    .map((ref) => resolveImport(file, ref.fileName))
+    .filter((f): f is string => f !== null)
 }
 
-/** Breitensuche über den Import-Graph. Gibt den Pfad zum Ziel zurück, sonst null. */
+/** Breitensuche über den Import-Graph. Gibt die Kette zum Ziel zurück, sonst null. */
 function pathToAdmin(entry: string): string[] | null {
   const queue: string[][] = [[entry]]
   const seen = new Set<string>([entry])
@@ -76,7 +92,6 @@ function pathToAdmin(entry: string): string[] | null {
 
     for (const next of importsOf(current)) {
       if (seen.has(next)) continue
-      if (ALLOWED.some((allowed) => next.startsWith(allowed))) continue
       seen.add(next)
       queue.push([...chain, next])
     }
@@ -91,15 +106,31 @@ describe('der service-role-Client bleibt unerreichbar', () => {
 
   for (const root of FORBIDDEN_ROOTS) {
     it(`keine Datei unter src/${root}/ erreicht admin.ts`, () => {
-      const entries = listFiles(resolve(SRC, root))
-      const offenders = entries
-        .map((entry) => ({ entry, chain: pathToAdmin(entry) }))
-        .filter((r) => r.chain !== null)
-        .map((r) => `\n  ${r.chain!.map((f) => relative(process.cwd(), f)).join('\n    → ')}`)
+      const offenders = listFiles(resolve(SRC, root))
+        .map((entry) => pathToAdmin(entry))
+        .filter((chain): chain is string[] => chain !== null)
+        .map((chain) => `\n  ${chain.map((f) => relative(process.cwd(), f)).join('\n    → ')}`)
 
-      // Die Fehlermeldung zeigt die ganze Import-Kette. Bei einem indirekten
-      // Treffer über drei Ebenen ist genau das die Information, die fehlt.
       expect(offenders, `admin.ts ist erreichbar über:${offenders.join('')}`).toEqual([])
     })
   }
+
+  // Ein Sicherheitstest, der nicht rot werden kann, beweist nichts. Diese
+  // Fälle prüfen den Prüfer — sie sind die Formen, an denen die erste Fassung
+  // vorbeigelaufen ist.
+  describe('der Prüfer erkennt alle Import-Formen', () => {
+    const formen = {
+      'statischer Import': "import x from '@/lib/supabase/admin'",
+      'Seiteneffekt-Import': "import '@/lib/supabase/admin'",
+      'dynamischer Import': "const x = await import('@/lib/supabase/admin')",
+      'Re-Export': "export * from '@/lib/supabase/admin'"
+    }
+
+    for (const [name, quelltext] of Object.entries(formen)) {
+      it(name, () => {
+        const { importedFiles } = ts.preProcessFile(quelltext, true, true)
+        expect(importedFiles.map((f) => f.fileName)).toContain('@/lib/supabase/admin')
+      })
+    }
+  })
 })

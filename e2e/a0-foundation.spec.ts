@@ -57,13 +57,49 @@ test('die Wahl überlebt einen Reload', async ({ page }) => {
   expect(await bodyBackground(page)).toBe(CANVAS_LIGHT)
 })
 
-test('die selbst gehosteten Schriften kommen an', async ({ page }) => {
+test('die selbst gehostete Schrift wird tatsächlich geladen', async ({ page }) => {
   await page.goto('/')
-  const family = await page
-    .getByRole('heading', { level: 1 })
-    .evaluate((el) => getComputedStyle(el).fontFamily)
-  // next/font vergibt gehashte Namen, deshalb auf den Fallback-Stack prüfen
-  // statt auf "Plus Jakarta Sans": entscheidend ist, dass --font-sans greift
-  // und nicht die nackte System-Schrift gerendert wird.
-  expect(family).toContain('ui-sans-serif')
+
+  const schrift = await page.getByRole('heading', { level: 1 }).evaluate(async (el) => {
+    // Erst abwarten, bis der Browser mit dem Laden aller Schriften fertig ist.
+    // Ohne das prüft man einen Zwischenstand.
+    await document.fonts.ready
+
+    const erste = getComputedStyle(el)
+      .fontFamily.split(',')[0]!
+      .trim()
+      .replace(/^["']|["']$/g, '')
+
+    // Nicht document.fonts.check() verwenden. Die Methode liefert auch für
+    // eine frei erfundene Familie `true`, weil der Browser auf eine
+    // Systemschrift zurückfällt und die als verfügbar gilt — nachgemessen.
+    // Aussagekräftig ist nur das FontFaceSet selbst: darin steht ausschließlich,
+    // was per @font-face wirklich deklariert wurde, also das, was next/font
+    // erzeugt hat.
+    const faces = [...document.fonts].map((f) => ({
+      family: f.family.replace(/^["']|["']$/g, ''),
+      status: f.status
+    }))
+
+    return { erste, faces }
+  })
+
+  // Die Überschrift muss mit unserer Schrift gesetzt sein, nicht mit einer
+  // System-Schrift aus dem Fallback-Stack.
+  expect(schrift.erste).toBe('Plus Jakarta Sans')
+
+  const passend = schrift.faces.filter((f) => f.family === schrift.erste)
+  expect(
+    passend.length,
+    `Keine @font-face-Deklaration für "${schrift.erste}". Vorhanden: ${JSON.stringify(schrift.faces)}`
+  ).toBeGreaterThan(0)
+
+  // Mindestens eine, nicht alle: next/font deklariert mehrere Schnitte, und
+  // der Browser lädt nur die, die auf dieser Seite tatsächlich gebraucht
+  // werden. Die übrigen stehen dauerhaft auf "unloaded" — das ist kein Fehler,
+  // sondern der Sinn der Sache.
+  expect(
+    passend.some((f) => f.status === 'loaded'),
+    `Kein Schnitt von "${schrift.erste}" geladen: ${JSON.stringify(passend)}`
+  ).toBe(true)
 })
