@@ -45,8 +45,11 @@ Datei hier ergänzt die Projektregeln.
   die Zugangsdaten aus `supabase status` und bricht ab, wenn nichts läuft — damit kann sie gar
   nicht versehentlich auf die echte Datenbank zeigen.
 - **`supabase/migrations/`** — handgeschriebenes SQL, durchnummeriert. Über jeder Policy und
-  jedem Index steht der Grund. Die Migrationen sind **wiederholbar**: `supabase db reset` läuft
-  im Alltag oft, also darf keine an einem bereits vorhandenen Objekt scheitern.
+  jedem Index steht der Grund. Migrationen laufen **genau einmal** gegen eine Datenbank —
+  Supabase führt darüber Buch (`supabase_migrations.schema_migrations`), und `supabase db reset`
+  legt die Datenbank neu an, statt sie erneut zu bespielen. Deshalb **kein** `if not exists` auf
+  jedem DDL: das würde einen echten Konflikt verdecken, statt ihn zu melden. Eine bereits
+  angewandte Migration wird nicht nachträglich geändert, sondern durch eine neue ergänzt.
   Erweiterungen (`vector`, `pg_cron`, `pg_net`) werden hier angelegt, nicht im Dashboard —
   im Dashboard gilt es für ein Projekt, hier für jede Umgebung.
 - **`design/`** — der Design-Canvas. Verbindliche Referenz für Farben, Radien und Schriften,

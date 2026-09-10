@@ -50,12 +50,9 @@ grant select on public.heartbeat to anon, authenticated;
 -- Geschrieben wird ausschließlich von pg_cron, das als Superuser läuft und an
 -- RLS vorbeigeht. Es gibt deshalb bewusst keine insert/update-Policy: kein
 -- Client soll hier je schreiben können.
--- unschedule zuerst: cron.schedule wirft bei einem bereits existierenden Job
--- nicht, überschreibt ihn aber auch nicht zuverlässig. So ist die Migration
--- wiederholbar, was sie sein muss — `supabase db reset` läuft im Alltag oft.
-select cron.unschedule('heartbeat')
-where exists (select 1 from cron.job where jobname = 'heartbeat');
-
+-- cron.schedule aktualisiert einen gleichnamigen Job, statt zu scheitern —
+-- nachgemessen. Eine vorherige unschedule-Absicherung stand hier und war
+-- überflüssig.
 select cron.schedule(
   'heartbeat',
   '17 4 */2 * *', -- alle zwei Tage, 17 nach, um die volle Stunde zu meiden

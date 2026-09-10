@@ -37,6 +37,9 @@ create index notebooks_owner_updated_idx on public.notebooks (owner_id, updated_
 
 alter table public.notebooks enable row level security;
 
+-- Die Grundregel des ganzen Produkts: ein Notebook gehört genau einer Person,
+-- und sichtbar ist nur, was einem selbst gehört. Jede weitere Policy hier ist
+-- eine Variante davon.
 create policy "notebooks: eigene lesen"
   on public.notebooks for select to authenticated
   using ((select auth.uid()) = owner_id);
@@ -56,6 +59,9 @@ create policy "notebooks: eigene ändern"
   using ((select auth.uid()) = owner_id)
   with check ((select auth.uid()) = owner_id);
 
+-- Kein with check: beim Löschen gibt es keine neue Zeile zu prüfen. Ohne diese
+-- Policy wäre Löschen gesperrt statt offen — RLS verweigert im Zweifel, und das
+-- äußert sich als Löschvorgang, der stillschweigend nichts tut.
 create policy "notebooks: eigene löschen"
   on public.notebooks for delete to authenticated
   using ((select auth.uid()) = owner_id);
@@ -63,14 +69,19 @@ create policy "notebooks: eigene löschen"
 grant select, insert, update, delete on public.notebooks to authenticated;
 
 -- ── Der Zugriffshelfer für alle abhängigen Tabellen ────────────────────────
--- Ohne ihn müsste jede Policy auf source_chunks, messages, notes … über zwei
--- Ebenen joinen. Das ist nicht nur langsam, es erzeugt bei Tabellen, die
--- gegenseitig aufeinander verweisen, auch rekursive Policy-Auswertung.
+-- Ohne ihn müsste jede Policy auf source_chunks, messages, notes … die
+-- Besitzfrage selbst ausformulieren. Eine Stelle, eine Definition.
 --
--- SECURITY DEFINER ist hier zulässig: die Funktion gibt keine Daten zurück,
--- sondern nur ja/nein, sie setzt search_path explizit, und sie prüft genau die
--- Frage, die sie im Namen trägt. Sie ist damit keine Umgehung von RLS, sondern
--- deren Baustein.
+-- SECURITY INVOKER, nicht DEFINER. Die erste Fassung stand auf DEFINER mit der
+-- Begründung, das vermeide rekursive Policy-Auswertung — für dieses Schema
+-- stimmt das nicht: keine Policy auf notebooks ruft diesen Helfer auf, es gibt
+-- also nichts, was rekursieren könnte. Nachgemessen verhalten sich beide
+-- Varianten identisch (Besitzer sieht seine Zeile, ein Fremder sieht nichts),
+-- und bei gleicher Wirkung gewinnt das geringere Recht.
+--
+-- Wann DEFINER nötig würde: sobald eine Tabelle hinzukommt, deren eigene Policy
+-- diesen Helfer aufruft — eine Mitgliedschaftstabelle für geteilte Notebooks
+-- wäre der Fall. Dann, und erst dann, ist der Wechsel begründet.
 --
 -- stable, nicht volatile: das erlaubt Postgres, das Ergebnis innerhalb eines
 -- Statements wiederzuverwenden statt es pro Zeile neu zu berechnen.
@@ -78,7 +89,7 @@ create function public.owns_notebook(notebook uuid)
 returns boolean
 language sql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
   select exists (
@@ -90,7 +101,7 @@ as $$
 $$;
 
 comment on function public.owns_notebook(uuid) is
-  'Baustein für die Policies aller notebook-abhängigen Tabellen. SECURITY DEFINER, gibt nur ja/nein zurück, setzt search_path explizit.';
+  'Baustein für die Policies aller notebook-abhängigen Tabellen. SECURITY INVOKER: die Prüfung läuft mit den Rechten des Aufrufers, RLS bleibt also auch innerhalb der Funktion in Kraft.';
 
 revoke all on function public.owns_notebook(uuid) from public;
 grant execute on function public.owns_notebook(uuid) to authenticated;
