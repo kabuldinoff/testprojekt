@@ -19,6 +19,22 @@
 -- Tabelle ein eigener grant-Block.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- ── Die Data-API liefert nichts von selbst aus ─────────────────────────────
+-- Auf dem gehosteten Projekt ist das eine Einstellung beim Anlegen
+-- ("automatically expose new tables", bewusst abgewählt). Der lokale Stack
+-- kennt diese Einstellung nicht: dort erbt jede neue Tabelle das
+-- Standard-grant an anon und authenticated.
+--
+-- Ohne diese beiden Zeilen unterscheiden sich die Umgebungen genau in der
+-- Frage, um die es geht — und der Isolationstest prüft lokal etwas anderes als
+-- das, was in Produktion gilt. Genau das ist passiert: derselbe Test lieferte
+-- lokal 401 und in CI 200.
+--
+-- Dieselbe Überlegung wie bei den Erweiterungen: was für die Sicherheit zählt,
+-- gehört in die Migration und nicht in eine Checkbox.
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+revoke all on all tables in schema public from anon, authenticated;
+
 -- pgvector wird erst mit den Quellen gebraucht, gehört aber hierher: eine
 -- Erweiterung nachträglich einzuschalten ist ein Deploy-Schritt mehr, und
 -- "extensions" ist das Schema, das Supabase dafür vorsieht.

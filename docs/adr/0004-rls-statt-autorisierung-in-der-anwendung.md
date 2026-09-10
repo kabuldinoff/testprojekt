@@ -61,9 +61,17 @@ durchzugehen. Mit echten Policies lässt sie sich in einem Test beweisen — sie
 - Ein `SECURITY DEFINER`-Helfer (`owns_notebook()`) verhindert, dass Policies abhängiger
   Tabellen über zwei Ebenen joinen. Er gibt nur ja/nein zurück und setzt `search_path`
   explizit — er ist Baustein von RLS, nicht Umgehung.
-- Die Data-API wurde ohne „automatically expose new tables" eingerichtet. Eine anonyme Abfrage
-  auf `notebooks` ergibt deshalb `401 permission denied` statt einer leeren Liste: die Tabelle
-  ist für `anon` gar nicht vorhanden. RLS ist damit das zweite Netz, nicht das einzige.
+- Die Data-API liefert nichts von selbst aus. Eine anonyme Abfrage auf `notebooks` ergibt
+  `401 permission denied` statt einer leeren Liste: die Tabelle ist für `anon` gar nicht
+  vorhanden. RLS ist damit das zweite Netz, nicht das einzige.
+
+  Das steht **in der Migration** und nicht nur als Häkchen beim Anlegen des Projekts. Der
+  Unterschied war messbar: die Einstellung „automatically expose new tables" gibt es nur auf
+  dem gehosteten Projekt, der lokale Stack vergibt das Standard-grant. Derselbe Isolationstest
+  lieferte deshalb lokal `401` und in CI `200` — er prüfte in der einen Umgebung etwas
+  anderes als in der anderen. Ein explizites `revoke` in der ersten Migration macht beide
+  Umgebungen gleich; jeder Zugriff wird danach pro Tabelle mit einem `grant` bewusst gewährt.
+
 - Fehlender Zugriff zeigt sich als **leere Ergebnismenge**, nicht als Fehler. Das ist gewollt:
   ein 403 würde bestätigen, dass die Zeile existiert. In der Oberfläche wird daraus ein 404.
 
