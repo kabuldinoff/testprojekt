@@ -17,6 +17,7 @@ import { asUser, createUser, type TestUser } from './lib/supabase'
 let alice: TestUser
 let mallory: TestUser
 let aliceNotebookId: string
+let aliceNoteId: string
 
 test.beforeAll(async ({ playwright }) => {
   const request = await playwright.request.newContext()
@@ -32,6 +33,17 @@ test.beforeAll(async ({ playwright }) => {
 
   const rows = (await created.json()) as Array<{ id: string }>
   aliceNotebookId = rows[0]!.id
+
+  // Eine Notiz dazu. `notes` ist die einzige Tabelle mit Policies für alle
+  // vier Operationen — und damit die einzige, bei der ein Fehler in genau
+  // einer davon durch die anderen drei verdeckt würde.
+  const note = await asUser(request, alice).post('notes', {
+    notebook_id: aliceNotebookId,
+    title: 'Alices Notiz',
+    content: 'Vertraulich.'
+  })
+  expect(note.ok(), await note.text()).toBe(true)
+  aliceNoteId = ((await note.json()) as Array<{ id: string }>)[0]!.id
 
   await request.dispose()
 })
@@ -111,6 +123,78 @@ test('Mallory kann kein Notebook in Alices Namen anlegen', async ({ request }) =
   })
   expect(response.ok()).toBe(false)
   expect(response.status()).toBe(403)
+})
+
+test('Mallory sieht Alices Notizen nicht', async ({ request }) => {
+  const response = await asUser(request, mallory).get(`notes?id=eq.${aliceNoteId}`)
+  expect(response.status()).toBe(200)
+  expect((await response.json()) as unknown[]).toEqual([])
+})
+
+test('Mallory kann Alices Notiz nicht ändern', async ({ request }) => {
+  // Der Weg, den die UPDATE-Policy zu verhindern hat. Ohne sie stünde in
+  // Alices Notiz plötzlich fremder Text — und sie hielte ihn für ihren eigenen.
+  const response = await asUser(request, mallory).patch(`notes?id=eq.${aliceNoteId}`, {
+    content: 'Von Mallory überschrieben.'
+  })
+  expect(response.status()).toBe(200)
+  expect((await response.json()) as unknown[]).toEqual([])
+
+  const nachher = await asUser(request, alice).get(`notes?id=eq.${aliceNoteId}&select=content`)
+  expect(((await nachher.json()) as Array<{ content: string }>)[0]!.content).toBe('Vertraulich.')
+})
+
+test('Mallory kann Alices Notiz nicht in ihr eigenes Notebook verschieben', async ({ request }) => {
+  // Genau dafür trägt die UPDATE-Policy neben `using` auch `with check`: das
+  // erste prüft die Zeile, wie sie ist, das zweite die Zeile, wie sie danach
+  // wäre. Ohne das zweite verschwände die Notiz beim Besitzer und tauchte
+  // woanders auf.
+  const eigenes = await asUser(request, mallory).post('notebooks', {
+    owner_id: mallory.userId,
+    title: 'Mallorys Notebook'
+  })
+  const malloryNotebookId = ((await eigenes.json()) as Array<{ id: string }>)[0]!.id
+
+  const response = await asUser(request, mallory).patch(`notes?id=eq.${aliceNoteId}`, {
+    notebook_id: malloryNotebookId
+  })
+  expect(response.status()).toBe(200)
+  expect((await response.json()) as unknown[]).toEqual([])
+})
+
+test('Mallory kann Alices Notiz nicht löschen', async ({ request }) => {
+  const response = await asUser(request, mallory).delete(`notes?id=eq.${aliceNoteId}`)
+  expect([200, 204]).toContain(response.status())
+
+  // Die eigentliche Prüfung: die Notiz ist noch da. Ein Löschen, das nichts
+  // trifft, meldet keinen Fehler — nur die Gegenprobe zeigt den Unterschied.
+  const nachher = await asUser(request, alice).get(`notes?id=eq.${aliceNoteId}`)
+  expect((await nachher.json()) as unknown[]).toHaveLength(1)
+})
+
+test('Mallory kann keine Notiz in Alices Notebook legen', async ({ request }) => {
+  const response = await asUser(request, mallory).post('notes', {
+    notebook_id: aliceNotebookId,
+    title: 'Untergeschoben',
+    content: 'Steht da wie von Alice.'
+  })
+  // 403: die INSERT-Policy lehnt ab, statt zu filtern — bei einem Einfügen
+  // gibt es nichts wegzufiltern.
+  expect(response.status()).toBe(403)
+})
+
+test('Alice kann ihre eigene Notiz ändern und löschen — die Gegenprobe', async ({ request }) => {
+  // Ohne diesen Test bewiesen die vorigen nur, dass `notes` niemandem gehört.
+  const geaendert = await asUser(request, alice).patch(`notes?id=eq.${aliceNoteId}`, {
+    content: 'Von Alice überarbeitet.'
+  })
+  expect((await geaendert.json()) as unknown[]).toHaveLength(1)
+
+  const geloescht = await asUser(request, alice).delete(`notes?id=eq.${aliceNoteId}`)
+  expect([200, 204]).toContain(geloescht.status())
+
+  const nachher = await asUser(request, alice).get(`notes?id=eq.${aliceNoteId}`)
+  expect((await nachher.json()) as unknown[]).toEqual([])
 })
 
 test('Mallory sieht Alices Profil nicht', async ({ request }) => {

@@ -17,8 +17,11 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import { ChatPanel } from '@/components/chat/chat-panel'
+import { ProviderSwitch } from '@/components/chat/provider-switch'
+import { NotesPanel, type NoteItem } from '@/components/notes/notes-panel'
 import { NotebookDelete } from '@/components/notebook-delete'
 import type { StoredMessage } from '@/lib/chat/ui'
+import { providerOrDefault } from '@/lib/llm/registry'
 import { AddSource } from '@/components/sources/add-source'
 import { SourceList, type SourceItem } from '@/components/sources/source-list'
 import { NotebookForm } from '@/components/notebook-form'
@@ -42,7 +45,7 @@ const loadNotebook = cache(async (notebookId: string) => {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('notebooks')
-    .select('id, title, emoji, description')
+    .select('id, title, emoji, description, chat_provider')
     .eq('id', notebookId)
     .maybeSingle()
 
@@ -118,6 +121,14 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
 
   const history: StoredMessage[] = (messageRows ?? []) as StoredMessage[]
 
+  const { data: noteRows, error: notesError } = await supabase
+    .from('notes')
+    .select('id, title, content, origin, citations')
+    .eq('notebook_id', notebook.id)
+    .order('updated_at', { ascending: false })
+
+  const notes: NoteItem[] = (noteRows ?? []) as NoteItem[]
+
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
   // verstecktes Formularfeld zu schreiben, wo der Client sie ändern könnte.
   const update = updateNotebook.bind(null, notebook.id)
@@ -148,8 +159,17 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
         </p>
       ) : null}
 
-      <section className="mt-8 flex flex-col gap-4">
-        <h2 className="text-base font-bold">Quellen</h2>
+      {/*
+        `aria-labelledby` macht aus dem <section> eine benannte Landmarke. Ohne
+        zugänglichen Namen hat ein <section> überhaupt keine Rolle — für die
+        Navigation per Screenreader ist es dann ein <div>. Nebeneffekt, der
+        beim Testen half: die Abschnitte werden adressierbar, statt dass ein
+        `getByLabel('Titel')` quer über die Seite greift.
+      */}
+      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-quellen">
+        <h2 id="abschnitt-quellen" className="text-base font-bold">
+          Quellen
+        </h2>
         {sourcesError ? (
           <p
             role="alert"
@@ -163,8 +183,14 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
         <AddSource notebookId={notebook.id} />
       </section>
 
-      <section className="mt-8 flex flex-col gap-4">
-        <h2 className="text-base font-bold">Chat</h2>
+      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-chat">
+        <h2 id="abschnitt-chat" className="text-base font-bold">
+          Chat
+        </h2>
+        <ProviderSwitch
+          notebookId={notebook.id}
+          current={providerOrDefault(notebook.chat_provider).id}
+        />
         {messagesError ? (
           <p
             role="alert"
@@ -181,8 +207,29 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
         )}
       </section>
 
-      <section className="mt-4 rounded-card border border-hairline bg-surface p-6">
-        <h2 className="mb-4 text-base font-bold">Einstellungen</h2>
+      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-notizen">
+        <h2 id="abschnitt-notizen" className="text-base font-bold">
+          Notizen
+        </h2>
+        {notesError ? (
+          <p
+            role="alert"
+            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+          >
+            Die Notizen konnten nicht geladen werden. Bitte die Seite neu laden.
+          </p>
+        ) : (
+          <NotesPanel notebookId={notebook.id} notes={notes} />
+        )}
+      </section>
+
+      <section
+        className="mt-8 rounded-card border border-hairline bg-surface p-6"
+        aria-labelledby="abschnitt-einstellungen"
+      >
+        <h2 id="abschnitt-einstellungen" className="mb-4 text-base font-bold">
+          Einstellungen
+        </h2>
         <NotebookForm
           action={update}
           submitLabel="Speichern"

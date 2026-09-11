@@ -16,7 +16,9 @@ Prüfpunkt zugeordnet werden kann.
 
 | b3 | `e2e/b3-chat-citations.spec.ts` | Antwort mit anklickbarem Beleg, und die angezeigte Passage ist die, auf der sie beruht; ein erfundener Beleg verschwindet; ohne ausgewählte Quelle wird nicht geantwortet; der Verlauf übersteht das Neuladen samt Belegen; ein fremdes Notebook ergibt **404** |
 
-Geplant, in der Reihenfolge der Umsetzung: `b4-audio-overview`, `c1-responsive`, `c2-a11y`,
+| b4 | `e2e/b4-provider-notes.spec.ts` | Anbieterwechsel ändert die Datenfluss-Aussage und überlebt das Neuladen; eine Antwort wird samt Belegen zur Notiz; eigene Notizen anlegen, ändern, löschen; eine abgelehnte Eingabe bleibt im Formular stehen; fremde Notizen ergeben **404** |
+
+Geplant, in der Reihenfolge der Umsetzung: `b5-audio-overview`, `c1-responsive`, `c2-a11y`,
 `d1-landing-seo`, `d2-design-tokens`.
 
 > `b3` läuft gegen einen Stub statt gegen Google und Mistral (`docs/adr/0006`). Der Weg zu den

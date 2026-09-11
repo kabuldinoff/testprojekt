@@ -5,7 +5,9 @@ import { DefaultChatTransport } from 'ai'
 import { useMemo, useState } from 'react'
 
 import { Answer } from '@/components/chat/answer'
+import { SaveAsNote } from '@/components/notes/save-as-note'
 import { Button } from '@/components/ui/button'
+import { rewriteMarkers } from '@/lib/chat/citations'
 import {
   sourcesOf,
   storedToUi,
@@ -126,16 +128,19 @@ export function ChatPanel({
         und ohne diese Auszeichnung bliebe er unangesagt.
       */}
       <ol aria-live="polite" aria-busy={laeuft} className="flex flex-col gap-4">
-        {messages.map((m) => (
+        {messages.map((m, i) => (
           <li key={m.id} className={m.role === 'user' ? 'flex justify-end' : ''}>
             {m.role === 'user' ? (
               <p className="max-w-[85%] rounded-card bg-brand-600 px-4 py-2 text-sm text-on-brand">
                 {textOf(m)}
               </p>
             ) : (
-              <div className="rounded-card border border-hairline bg-surface px-4 py-3">
-                <Answer text={textOf(m)} sources={sourcesOf(m)} />
-              </div>
+              <Assistant
+                notebookId={notebookId}
+                message={m}
+                // Nur die letzte Nachricht kann noch im Fluss sein.
+                stroemt={laeuft && i === messages.length - 1}
+              />
             )}
           </li>
         ))}
@@ -191,6 +196,52 @@ export function ChatPanel({
             ? 'Sobald eine Quelle verarbeitet ist, können Sie hier Fragen dazu stellen.'
             : 'Dieses Notebook hat derzeit keine verarbeitete Quelle. Der bisherige Verlauf bleibt lesbar; neue Fragen sind erst wieder möglich, wenn eine Quelle bereit ist.'}
         </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Eine Antwort samt der Möglichkeit, sie zu behalten.
+ *
+ * Der Text wird hier einmal bereinigt und an beide weitergereicht: die
+ * Darstellung und die Notiz sollen dasselbe zeigen. Eine gespeicherte Notiz
+ * mit einem erfundenen Beleg darin wäre besonders ärgerlich — sie überlebt das
+ * Gespräch.
+ *
+ * `rewriteMarkers` läuft in `Answer` noch einmal. Das ist kein Versehen: die
+ * Funktion ist idempotent, und `Answer` soll auch dann richtig anzeigen, wenn
+ * sie jemand mit rohem Text aufruft.
+ */
+function Assistant({
+  notebookId,
+  message,
+  stroemt
+}: {
+  notebookId: string
+  message: NotabeneMessage
+  stroemt: boolean
+}) {
+  const sources = sourcesOf(message)
+  const { text, used } = rewriteMarkers(textOf(message), (n) => sources.some((s) => s.n === n))
+
+  // Nur die Belege, die im Text auch vorkommen. `sources` enthält alle
+  // Ausschnitte, die dem Modell vorlagen — meist mehr, als es zitiert hat.
+  // Landeten sie ungefiltert in der Notiz, führte die Belegliste darunter
+  // Quellen auf, auf denen die Aussage gar nicht beruht. Das ist die
+  // unangenehmste Sorte Fehler in diesem Produkt: er sieht nach Sorgfalt aus.
+  const zitiert = sources.filter((s) => used.includes(s.n))
+
+  return (
+    <div className="rounded-card border border-hairline bg-surface px-4 py-3">
+      <Answer text={text} sources={sources} />
+      {/*
+        Erst anbieten, wenn die Antwort fertig ist. Während des Strömens wäre
+        der Knopf ein Angebot, das man bereut: gespeichert würde der halbe
+        Satz, der zufällig gerade dastand.
+      */}
+      {stroemt || text.length === 0 ? null : (
+        <SaveAsNote notebookId={notebookId} content={text} citations={zitiert} />
       )}
     </div>
   )

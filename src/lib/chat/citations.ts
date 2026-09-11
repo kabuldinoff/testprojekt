@@ -15,6 +15,7 @@
  * Diese Datei ist rein: kein Netz, keine Datenbank. Sie ist der Grund, warum
  * sich das Verhalten ohne laufendes Modell prüfen lässt.
  */
+import { z } from 'zod'
 
 /** Ein Ausschnitt, wie ihn die Suche liefert. */
 export interface RetrievedChunk {
@@ -29,21 +30,26 @@ export interface RetrievedChunk {
 }
 
 /**
- * Ein geprüfter Verweis. Genau das, was in `messages.citations` landet.
+ * Die Form eines Verweises — als Schema, nicht nur als Typ.
  *
- * Die Positionsangaben werden mitgespeichert und nicht später nachgeschlagen:
- * löscht der Nutzer die Quelle, soll die alte Antwort lesbar bleiben. Siehe
- * den Kommentar an der Spalte in Migration 0008.
+ * Ein TypeScript-Typ verschwindet beim Übersetzen. Für eine Server Action, die
+ * eine Belegliste entgegennimmt, ist er deshalb wertlos: Was dort ankommt, ist
+ * JSON vom Client, und `[null]` oder `[{}]` passieren jede Typprüfung, weil es
+ * keine mehr gibt. In der Datenbank stünde dann eine Notiz, deren Belege beim
+ * Rendern einen Fehler auslösen.
+ *
+ * Der Typ wird aus dem Schema abgeleitet und nicht daneben geschrieben, damit
+ * beide nicht auseinanderlaufen können.
  */
-export interface Citation {
-  /** Die Zahl, die im Text steht. Beginnt bei 1. */
-  n: number
-  sourceId: string
-  sourceTitle: string
-  chunkIndex: number
-  pageNumber: number | null
-  charStart: number
-  charEnd: number
+export const citationSchema = z.object({
+  n: z.number().int().positive(),
+  sourceId: z.uuid(),
+  sourceTitle: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
+  pageNumber: z.number().int().nullable(),
+  charStart: z.number().int().nonnegative(),
+  charEnd: z.number().int().nonnegative(),
+
   /**
    * Die belegte Passage im Wortlaut.
    *
@@ -58,8 +64,20 @@ export interface Citation {
    *    Gesprächs aus dem Strom, nach dem Neuladen aus der Datenbank — zwei
    *    Wege zu denselben Daten, die unterschiedlich falsch sein können.
    */
-  excerpt: string
-}
+  excerpt: z.string()
+})
+
+/** Eine Belegliste, wie sie an einer Systemgrenze ankommt. */
+export const citationsSchema = z.array(citationSchema)
+
+/**
+ * Ein geprüfter Verweis. Genau das, was in `messages.citations` landet.
+ *
+ * Die Positionsangaben werden mitgespeichert und nicht später nachgeschlagen:
+ * löscht der Nutzer die Quelle, soll die alte Antwort lesbar bleiben. Siehe
+ * den Kommentar an der Spalte in Migration 0008.
+ */
+export type Citation = z.infer<typeof citationSchema>
 
 /**
  * Findet `[1]`, `[2, 3]`, `[4,5]` — eine Klammer mit einer oder mehreren
