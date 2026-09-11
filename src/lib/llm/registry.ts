@@ -65,7 +65,10 @@ export const PROVIDERS: Record<ProviderId, Provider> = {
   mistral: {
     id: 'mistral',
     label: 'Mistral',
-    hint: 'Vollständig in der EU',
+    // Bewusst nicht „Vollständig in der EU" — das ist der Anfang des
+    // Datenfluss-Satzes darunter, und zwei Elemente mit demselben Text sind
+    // für Screenreader wie für Tests eine Dopplung ohne Nutzen.
+    hint: 'Verarbeitung in der EU',
     capabilities: { tts: false },
     dataFlow:
       'Vollständig in der EU. Indexierung und Antworten laufen über Mistral, ' +

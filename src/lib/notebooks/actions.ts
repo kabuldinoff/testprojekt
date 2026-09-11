@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
 
+import { isProviderId } from '@/lib/llm/registry'
+
 import { firstIssue, parseNotebookForm } from './schema'
 
 /**
@@ -110,4 +112,39 @@ export async function deleteNotebook(
 
   revalidatePath('/app')
   redirect('/app')
+}
+
+/**
+ * Wechselt den Chat-Anbieter eines Notebooks.
+ *
+ * Eine eigene Action und nicht Teil von `updateNotebook`: der Wechsel ist eine
+ * einzelne Umschaltung neben dem Gespräch, kein Formular mit Speichern-Knopf.
+ * Über `updateNotebook` müsste die Oberfläche Titel, Emoji und Beschreibung
+ * mitschicken, nur um ein Feld zu ändern — und ein unbeteiligtes Feld, das bei
+ * jedem Anbieterwechsel mitgeschrieben wird, ist eine Gelegenheit, etwas zu
+ * überschreiben.
+ *
+ * Der Wert wird gegen die Registry geprüft, bevor er die Datenbank sieht. Die
+ * Spalte hat denselben CHECK — doppelt, weil beide etwas anderes leisten: hier
+ * entsteht eine Meldung, dort eine Garantie.
+ */
+export async function setChatProvider(notebookId: string, provider: string): Promise<FormState> {
+  if (!isProviderId(provider)) return { error: 'Diesen Anbieter gibt es nicht.' }
+
+  const { supabase } = await requireUserId()
+
+  const { data, error } = await supabase
+    .from('notebooks')
+    .update({ chat_provider: provider })
+    .eq('id', notebookId)
+    .select('id')
+
+  if (error) return { error: 'Der Anbieter konnte nicht gewechselt werden.' }
+
+  // Leeres Ergebnis heißt: die Policy hat die Zeile herausgefiltert — für den
+  // Nutzer nicht von „gibt es nicht" zu unterscheiden, und genau so gewollt.
+  if (data.length === 0) return { error: 'Dieses Notebook gibt es nicht.' }
+
+  revalidatePath(`/app/${notebookId}`)
+  return {}
 }
