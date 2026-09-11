@@ -156,6 +156,17 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
   eigentliche Grenze (Sicherheit). Fielen die ersten beiden aus, käme trotzdem nichts heraus.
 - **`getUser()`, nie `getSession()`,** wo über Zugriff entschieden wird. `getSession` liest das
   Cookie und vertraut ihm; `getUser` prüft die Signatur beim Auth-Server.
+- **`service_role` hat nur ausdrücklich gewährte Rechte** (Migration 0010). Die Rolle umgeht RLS
+  vollständig; was sie darf, muss man aufzählen können. Entzogen wird zuerst, gewährt wird
+  einzeln — auch per `alter default privileges`, damit eine spätere Tabelle die Vergabe nicht
+  überspringt. Dadurch gilt lokal dasselbe wie in Produktion, und `e2e/b2-upload-ingest` prüft
+  es bei jedem Lauf mit.
+
+  Zwei Fallen dabei, beide nachgemessen: `update … where` und `delete … where` brauchen
+  **`select`** auf die Spalten der Bedingung, sonst antwortet PostgREST mit `permission denied`,
+  obwohl das Schreibrecht gewährt ist. Und `update … returning` — wie in `claim_source` — braucht
+  es ebenfalls.
+
 - **Das Projekt wurde ohne „automatically expose new tables" angelegt.** Neue Tabellen sind für
   die Data-API zunächst unsichtbar; jeder Zugriff wird pro Tabelle per `grant` bewusst gewährt.
   Für `anon` ergibt eine Abfrage auf `notebooks` deshalb `401 permission denied` und nicht etwa
