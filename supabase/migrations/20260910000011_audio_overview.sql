@@ -63,31 +63,65 @@ create trigger audio_overviews_touch_updated_at
 
 alter table public.audio_overviews enable row level security;
 
--- Lesen und Anfordern darf der Besitzer. `(select auth.uid())` steckt in
--- owns_notebook(): einmal pro Statement ausgewertet statt einmal pro Zeile.
+-- ── Wer was schreiben darf ────────────────────────────────────────────────
+--
+-- Der erste Entwurf gab `authenticated` volles Schreibrecht auf die Tabelle.
+-- Damit hätte ein angemeldeter Nutzer per direktem Aufruf `status = ready`
+-- setzen, ein Skript erfinden, einen fremden `storage_path` eintragen oder
+-- `attempts` auf den Anschlag drehen können — lauter Felder, die dem
+-- Verarbeitungslauf gehören.
+--
+-- Die Lösung sind **spaltengenaue Rechte** plus eine Policy, die den
+-- Zielzustand festnagelt. Kein Hilfskonstrukt mit erhöhten Rechten: Ein
+-- `security definer`-Wrapper wäre eine zweite Stelle, an der die
+-- Besitzprüfung stimmen muss, und `CLAUDE.md` schließt ihn für alles aus, was
+-- PostgREST exponiert.
+--
+-- `(select auth.uid())` steckt in owns_notebook(): einmal pro Statement
+-- ausgewertet statt einmal pro Zeile.
 create policy "audio_overviews: lesen im eigenen Notebook"
   on public.audio_overviews for select to authenticated
   using (public.owns_notebook(notebook_id));
 
--- Anfordern heißt eine Zeile mit `pending` anlegen. Den Rest schreibt der
--- Verarbeitungslauf.
+-- Anfordern heißt: eine Zeile anlegen. Mehr als `notebook_id` darf der Client
+-- gar nicht setzen (siehe `grant insert (notebook_id)` unten), alles andere
+-- kommt aus den Vorgabewerten — `status` also auf `pending`.
 create policy "audio_overviews: anfordern im eigenen Notebook"
   on public.audio_overviews for insert to authenticated
   with check (public.owns_notebook(notebook_id));
 
--- Neu erzeugen setzt die bestehende Zeile zurück. Ohne UPDATE bliebe nur
--- löschen und neu anlegen — zwei Schritte, zwischen denen ein Abbruch die
--- Zeile verschwinden ließe.
+-- Neu erzeugen heißt: einen **abgeschlossenen** Überblick zurück auf `pending`
+-- setzen. Zwei Bedingungen, und beide tragen etwas anderes:
+--
+--   `using`      — nur aus einem Endzustand heraus. Damit kann ein zweiter
+--                  Klick oder ein zweiter Browser-Tab einen laufenden Job
+--                  nicht zurücksetzen. Sonst entstünde ein zweiter
+--                  Verarbeitungslauf, der demselben Überblick
+--                  hinterherschreibt — bei der Sprachausgabe der teuerste
+--                  aller Doppelläufe.
+--   `with check` — der neue Zustand ist immer `pending`. Ein Client kann
+--                  damit keinen Zustand behaupten, den nur der Worker
+--                  herstellen darf.
 create policy "audio_overviews: neu erzeugen im eigenen Notebook"
   on public.audio_overviews for update to authenticated
-  using (public.owns_notebook(notebook_id))
-  with check (public.owns_notebook(notebook_id));
+  using (public.owns_notebook(notebook_id) and status in ('ready', 'script_only', 'failed'))
+  with check (public.owns_notebook(notebook_id) and status = 'pending');
 
+-- Löschen darf der Besitzer, weil ein Überblick sein Erzeugnis ist: Er kann
+-- die Quellen wechseln und den alten Überblick loswerden wollen, ohne das
+-- ganze Notebook zu löschen. Die Audiodatei bleibt dabei im Bucket liegen —
+-- eine Fußnote, die in docs/security.md steht.
 create policy "audio_overviews: löschen im eigenen Notebook"
   on public.audio_overviews for delete to authenticated
   using (public.owns_notebook(notebook_id));
 
-grant select, insert, update, delete on public.audio_overviews to authenticated;
+-- Spaltengenau. `insert` nur auf `notebook_id`, `update` nur auf `status` —
+-- alles Übrige gehört dem Verarbeitungslauf, und was nicht gewährt ist, kann
+-- keine Policy versehentlich öffnen.
+grant select on public.audio_overviews to authenticated;
+grant insert (notebook_id) on public.audio_overviews to authenticated;
+grant update (status) on public.audio_overviews to authenticated;
+grant delete on public.audio_overviews to authenticated;
 
 -- Der Verarbeitungslauf. Nach der Regel aus Migration 0010: entzogen ist
 -- alles, gewährt wird einzeln — und `select` gehört dazu, weil
@@ -103,9 +137,10 @@ values (
   'audio',
   'audio',
   false,
-  12582912, -- 12 MiB. Gemessen: 2,75 MB pro Minute bei 24 kHz/16 Bit/Mono,
-            -- der Deckel liegt bei drei Minuten. 12 MiB lassen Spielraum,
-            -- ohne dass ein Fehler unbegrenzt Platz kostet.
+  12582912, -- 12 MiB. Gerechnet: 24 kHz × 16 Bit × Mono sind 48.000 Byte je
+            -- Sekunde, drei Minuten also 8.640.000 Byte (8,64 MB bzw.
+            -- 8,24 MiB). Der Deckel liegt bei drei Minuten; 12 MiB lassen
+            -- Spielraum, ohne dass ein Fehler unbegrenzt Platz kostet.
   array['audio/wav']
 )
 on conflict (id) do nothing;
@@ -178,10 +213,21 @@ as $$
 declare
   betroffen integer;
 begin
+  -- Zwei Ausgänge, und der zweite ist der Grund für diese Verzweigung.
+  --
+  -- Stirbt der **letzte** erlaubte Versuch, wäre `pending` eine Sackgasse:
+  -- `claim_audio_overview` verlangt `attempts < p_max_attempts` und würde die
+  -- Zeile nie wieder übernehmen. Die Oberfläche zeigte „wird erzeugt", der
+  -- Client fragte endlos nach, und niemand käme je. Ein hängender Ladebalken,
+  -- den kein Fehler erklärt.
   update public.audio_overviews
-  set status = 'pending',
+  set status = case when attempts >= 3 then 'failed' else 'pending' end,
       lease_expires_at = null,
-      error_message = 'Ein Erzeugungsversuch wurde abgebrochen. Es wird erneut versucht.'
+      error_message = case
+        when attempts >= 3
+          then 'Die Erzeugung wurde mehrfach abgebrochen und wird nicht erneut versucht.'
+        else 'Ein Erzeugungsversuch wurde abgebrochen. Es wird erneut versucht.'
+      end
   where status = 'processing'
     and lease_expires_at is not null
     and lease_expires_at < now();

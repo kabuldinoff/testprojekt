@@ -71,6 +71,44 @@ async function claim(admin: Admin, notebookId: string): Promise<Claimed | null> 
 }
 
 /**
+ * Schreibt in die Zeile — aber nur, wenn sie noch diesem Lauf gehört.
+ *
+ * Jeder Schreibzugriff prüft `status = 'processing'` **und** den beim
+ * Übernehmen gesehenen Versuchszähler. Ohne diese zweite Bedingung gilt:
+ * Läuft die Lease ab, weil ein Lauf hängt, übernimmt der nächste die Zeile —
+ * und der erste kann, wenn er doch noch aufwacht, dem zweiten
+ * hinterherschreiben. Das Ergebnis wäre ein `ready` mit dem Pfad des ersten
+ * Laufs, während der zweite gerade eine andere Datei ablegt.
+ *
+ * Der Rückgabewert sagt, ob die Zeile noch diesem Lauf gehörte. Trifft der
+ * Schreibzugriff nichts, ist das kein Fehler, sondern ein überholter Lauf —
+ * er hört dann auf, statt zu stören.
+ */
+async function writeIfStillOurs(
+  admin: Admin,
+  job: Claimed,
+  patch: Record<string, unknown>
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from('audio_overviews')
+    .update(patch)
+    .eq('id', job.id)
+    .eq('status', 'processing')
+    .eq('attempts', job.attempts)
+    .select('id')
+
+  if (error) {
+    console.error('[audio] Schreibzugriff fehlgeschlagen', job.id, error)
+    return false
+  }
+  if (data.length === 0) {
+    console.warn('[audio] Lauf überholt, Zeile gehört einem neueren Versuch', job.id)
+    return false
+  }
+  return true
+}
+
+/**
  * Hält das Scheitern fest.
  *
  * `permanent` entscheidet, ob es einen weiteren Versuch gibt — genau wie beim
@@ -79,23 +117,17 @@ async function claim(admin: Admin, notebookId: string): Promise<Claimed | null> 
  */
 async function fail(
   admin: Admin,
-  id: string,
+  job: Claimed,
   message: string,
-  attempts: number,
   permanent: boolean
 ): Promise<void> {
-  const endgueltig = permanent || attempts >= MAX_ATTEMPTS
-  const { error } = await admin
-    .from('audio_overviews')
-    .update({
-      status: endgueltig ? 'failed' : 'pending',
-      error_message: message,
-      lease_expires_at: null,
-      ...(permanent ? { attempts: MAX_ATTEMPTS } : {})
-    })
-    .eq('id', id)
-
-  if (error) console.error('[audio] Fehlerzustand nicht gespeichert', id, error)
+  const endgueltig = permanent || job.attempts >= MAX_ATTEMPTS
+  await writeIfStillOurs(admin, job, {
+    status: endgueltig ? 'failed' : 'pending',
+    error_message: message,
+    lease_expires_at: null,
+    ...(permanent ? { attempts: MAX_ATTEMPTS } : {})
+  })
 }
 
 /** Sammelt die Quellen eines Notebooks samt ihren Abschnitten. */
@@ -142,23 +174,34 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
   const job = await claim(admin, notebookId)
   if (!job) return { status: 'skipped' }
 
-  const { data: notebook } = await admin
+  // Der Besitzer ist Pflicht, nicht Beiwerk: Der Ablagepfad beginnt mit
+  // seiner Nutzer-ID, und daran hängt die Lese-Policy des Buckets. Ohne ihn
+  // landete die Datei unter einem Platzhalterpfad, den niemand mehr signieren
+  // kann — der Überblick stünde auf `ready` und wäre nicht abspielbar.
+  const { data: notebook, error: notebookError } = await admin
     .from('notebooks')
-    .select('owner_id, chat_provider')
+    .select('owner_id')
     .eq('id', notebookId)
-    .maybeSingle<{ owner_id: string; chat_provider: string }>()
+    .maybeSingle<{ owner_id: string }>()
+
+  if (notebookError || !notebook) {
+    console.error('[audio] Notebook nicht lesbar', notebookId, notebookError)
+    const message = 'Das Notebook konnte nicht gelesen werden.'
+    await fail(admin, job, message, false)
+    return { status: 'failed', message }
+  }
 
   const quellen = await loadSources(admin, notebookId)
   if (quellen === null) {
     const message = 'Die Quellen konnten nicht gelesen werden.'
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
   if (quellen.length === 0) {
     // Dauerhaft: Dass keine verarbeitete Quelle da ist, ändert sich nicht
     // durch einen weiteren Versuch.
     const message = 'Für einen Überblick braucht es mindestens eine verarbeitete Quelle.'
-    await fail(admin, job.id, message, job.attempts, true)
+    await fail(admin, job, message, true)
     return { status: 'failed', message }
   }
 
@@ -178,22 +221,20 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
     })
     roh = ergebnis.text
 
-    if (notebook) {
-      await logLlmCall(admin, {
-        userId: notebook.owner_id,
-        notebookId,
-        kind: 'chat',
-        provider: 'gemini',
-        model: modelId,
-        inputTokens: ergebnis.usage.inputTokens ?? 0,
-        outputTokens: ergebnis.usage.outputTokens ?? 0,
-        durationMs: Date.now() - begonnen
-      })
-    }
+    await logLlmCall(admin, {
+      userId: notebook.owner_id,
+      notebookId,
+      kind: 'chat',
+      provider: 'gemini',
+      model: modelId,
+      inputTokens: ergebnis.usage.inputTokens ?? 0,
+      outputTokens: ergebnis.usage.outputTokens ?? 0,
+      durationMs: Date.now() - begonnen
+    })
   } catch (error) {
     console.error('[audio] Skript fehlgeschlagen', notebookId, error)
     const message = 'Das Skript konnte nicht erzeugt werden.'
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
 
@@ -203,7 +244,7 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
     // nächsten Mal oft. Nach MAX_ATTEMPTS endet es mit einer Meldung, die
     // sagt, was nicht stimmte.
     const message = SCRIPT_PROBLEM_MESSAGES[geprueft.problem!]
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
   const script = geprueft.script!
@@ -211,14 +252,9 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
   // Das Skript wird **vor** der Vertonung gespeichert. Genau das macht
   // `script_only` möglich: Schlägt die Sprachausgabe fehl, ist der Text schon
   // da und nicht erst zu retten.
-  const { error: scriptError } = await admin
-    .from('audio_overviews')
-    .update({ script })
-    .eq('id', job.id)
-
-  if (scriptError) {
+  if (!(await writeIfStillOurs(admin, job, { script }))) {
     const message = 'Das Skript konnte nicht gespeichert werden.'
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
 
@@ -234,31 +270,46 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
     console.error('[audio] Vertonung fehlgeschlagen', notebookId, error)
     const message =
       'Der Text steht, die Sprachausgabe war nicht verfügbar. Sie können ihn unten mitlesen.'
-    const { error: markError } = await admin
-      .from('audio_overviews')
-      .update({ status: 'script_only', error_message: message, lease_expires_at: null })
-      .eq('id', job.id)
-    if (markError) console.error('[audio] script_only nicht gespeichert', job.id, markError)
+
+    // Der Endzustand muss ankommen, sonst ist er keiner. Bleibt die Zeile auf
+    // `processing` stehen, holt der Reaper sie zurück auf `pending`, der
+    // Client stößt erneut an — und die Vertonung wird genau so oft wiederholt,
+    // wie `script_only` es verhindern soll.
+    //
+    // `storage_path` wird geleert: Nach einem Neuerzeugen stünde dort sonst
+    // die Datei des **vorigen** Laufs, und die Oberfläche zeigte ein Audio,
+    // das nicht zum angezeigten Skript gehört.
+    const gespeichert = await writeIfStillOurs(admin, job, {
+      status: 'script_only',
+      error_message: message,
+      storage_path: null,
+      duration_seconds: null,
+      lease_expires_at: null
+    })
+
+    if (!gespeichert) {
+      const fehlermeldung = 'Der Zustand konnte nicht gespeichert werden.'
+      await fail(admin, job, fehlermeldung, false)
+      return { status: 'failed', message: fehlermeldung }
+    }
     return { status: 'script_only', message }
   }
 
-  if (notebook) {
-    await logLlmCall(admin, {
-      userId: notebook.owner_id,
-      notebookId,
-      kind: 'tts',
-      provider: 'gemini',
-      model: 'tts',
-      inputTokens: script.length,
-      outputTokens: audio.bytes.length,
-      durationMs: Date.now() - ttsBegonnen
-    })
-  }
+  await logLlmCall(admin, {
+    userId: notebook.owner_id,
+    notebookId,
+    kind: 'tts',
+    provider: 'gemini',
+    model: 'tts',
+    inputTokens: script.length,
+    outputTokens: audio.bytes.length,
+    durationMs: Date.now() - ttsBegonnen
+  })
 
   // ── Ablegen ──────────────────────────────────────────────────────────────
   // Pfad wie beim Quellen-Bucket: {user_id}/{notebook_id}.wav. Der erste
   // Abschnitt ist die Nutzer-ID, an der die Lese-Policy hängt.
-  const pfad = `${notebook?.owner_id ?? 'unbekannt'}/${notebookId}.wav`
+  const pfad = `${notebook.owner_id}/${notebookId}.wav`
   const { error: uploadError } = await admin.storage
     .from('audio')
     .upload(pfad, audio.bytes, { contentType: 'audio/wav', upsert: true })
@@ -269,27 +320,24 @@ export async function generateOverview(notebookId: string): Promise<OverviewOutc
     // wissen, dass es erneut versucht wird.
     console.error('[audio] Ablegen fehlgeschlagen', notebookId, uploadError)
     const message = 'Die Audiodatei konnte nicht abgelegt werden. Es wird erneut versucht.'
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
 
   const seconds = durationSeconds(audio.bytes.length)
-  const { error: finishError } = await admin
-    .from('audio_overviews')
-    .update({
-      status: 'ready',
-      storage_path: pfad,
-      duration_seconds: seconds,
-      error_message: null,
-      lease_expires_at: null
-    })
-    .eq('id', job.id)
+  const abgeschlossen = await writeIfStillOurs(admin, job, {
+    status: 'ready',
+    storage_path: pfad,
+    duration_seconds: seconds,
+    error_message: null,
+    lease_expires_at: null
+  })
 
-  if (finishError) {
+  if (!abgeschlossen) {
     // Ohne diese Prüfung meldete die Funktion `ready`, während die Zeile auf
     // `processing` stehen bliebe — der Client fragt endlos weiter ab.
     const message = 'Der Abschluss konnte nicht gespeichert werden.'
-    await fail(admin, job.id, message, job.attempts, false)
+    await fail(admin, job, message, false)
     return { status: 'failed', message }
   }
 

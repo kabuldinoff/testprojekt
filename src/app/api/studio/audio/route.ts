@@ -9,6 +9,7 @@
 import { after } from 'next/server'
 import { z } from 'zod'
 
+import { PROVIDERS, providerOrDefault } from '@/lib/llm/registry'
 import { generateOverview } from '@/lib/studio/overview'
 import { createClient } from '@/lib/supabase/server'
 
@@ -41,38 +42,82 @@ export async function POST(request: Request): Promise<Response> {
   // 404 und nicht 403, weil ein 403 dessen Existenz bestätigte.
   const { data: notebook } = await supabase
     .from('notebooks')
-    .select('id')
+    .select('id, chat_provider')
     .eq('id', notebookId)
-    .maybeSingle<{ id: string }>()
+    .maybeSingle<{ id: string; chat_provider: string }>()
 
   if (!notebook) return Response.json({ message: 'Nicht gefunden.' }, { status: 404 })
 
-  // Anfordern heißt: die Zeile auf `pending` setzen. Als Upsert, weil ein
-  // Notebook höchstens einen Überblick hat — ein zweiter Klick erzeugt keinen
-  // zweiten, sondern ersetzt den alten.
+  // Die Fähigkeitsprüfung gehört hierher und nicht nur in die Oberfläche.
+  //
+  // Der Überblick geht immer über Gemini — vertonen kann nur dieser Anbieter.
+  // Steht das Notebook auf Mistral, hat der Nutzer die Zusage „Vollständig in
+  // der EU" vor sich. Ein direkter Aufruf an diese Route würde die Quellen
+  // trotzdem an Google schicken und diese Zusage brechen, ohne dass jemand es
+  // merkte. Eine ausgegraute Schaltfläche ist dagegen keine Grenze.
+  const provider = providerOrDefault(notebook.chat_provider)
+  if (!provider.capabilities.tts) {
+    return Response.json(
+      {
+        message:
+          `Der Audio-Überblick ist mit ${provider.label} nicht verfügbar. ` +
+          `Stellen Sie das Notebook auf ${PROVIDERS.gemini.label} um.`
+      },
+      { status: 409 }
+    )
+  }
+
+  // Anfordern heißt: die Zeile auf `pending` bringen — in genau drei Fällen,
+  // und die Datenbank entscheidet welcher.
+  //
+  //   1. Es gibt einen abgeschlossenen Überblick → zurück auf `pending`.
+  //   2. Es gibt keinen → anlegen.
+  //   3. Es läuft bereits einer → nichts tun, 409.
+  //
+  // Fall 3 trägt die Policy, nicht dieser Code: Ihr `using` lässt ein Update
+  // nur aus `ready`, `script_only` oder `failed` heraus zu. Ein zweiter Klick
+  // oder ein zweiter Browser-Tab kann einen laufenden Job damit gar nicht
+  // zurücksetzen. Täte er es, liefen zwei Vertonungen gegen dieselbe Zeile —
+  // beim teuersten Schritt des Projekts der schlechteste Doppellauf.
   //
   // Über den RLS-Client, nicht über den Worker: Das ist die Handlung des
-  // Nutzers, und die Policy soll sie tragen.
-  const { error: upsertError } = await supabase.from('audio_overviews').upsert(
-    {
-      notebook_id: notebookId,
-      status: 'pending',
-      attempts: 0,
-      script: null,
-      storage_path: null,
-      duration_seconds: null,
-      error_message: null,
-      lease_expires_at: null
-    },
-    { onConflict: 'notebook_id' }
-  )
+  // Nutzers, und die Policy soll sie tragen. Geschrieben wird nur `status`;
+  // mehr ist `authenticated` gar nicht gewährt (Migration 0011).
+  const { data: aktualisiert, error: updateError } = await supabase
+    .from('audio_overviews')
+    .update({ status: 'pending' })
+    .eq('notebook_id', notebookId)
+    .select('id')
 
-  if (upsertError) {
-    console.error('[audio] Anforderung nicht gespeichert', notebookId, upsertError)
+  if (updateError) {
+    console.error('[audio] Anforderung nicht gespeichert', notebookId, updateError)
     return Response.json(
       { message: 'Der Überblick konnte nicht angefordert werden.' },
       { status: 500 }
     )
+  }
+
+  if (aktualisiert.length === 0) {
+    // Entweder gibt es noch keine Zeile, oder sie läuft gerade. Das Einfügen
+    // unterscheidet die beiden: Bei einer laufenden Zeile schlägt es an der
+    // Eindeutigkeitsbedingung fehl.
+    const { error: insertError } = await supabase
+      .from('audio_overviews')
+      .insert({ notebook_id: notebookId })
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        return Response.json(
+          { message: 'Es wird bereits ein Überblick erzeugt. Einen Moment bitte.' },
+          { status: 409 }
+        )
+      }
+      console.error('[audio] Anforderung nicht angelegt', notebookId, insertError)
+      return Response.json(
+        { message: 'Der Überblick konnte nicht angefordert werden.' },
+        { status: 500 }
+      )
+    }
   }
 
   after(async () => {

@@ -76,14 +76,22 @@ export function buildSourceDigest(sources: ScriptSource[]): string {
     .map((quelle) => {
       let text = ''
       for (const ausschnitt of quelle.excerpts) {
-        if (text.length + ausschnitt.length > proQuelle) break
+        const rest = proQuelle - text.length
+        if (rest <= 0) break
+
+        // Passt der Ausschnitt nicht mehr ganz, wird der Rest des Budgets
+        // mit seinem Anfang gefüllt und dann abgebrochen.
+        //
+        // Die erste Fassung brach hier einfach ab. Folge: Ein kurzer erster
+        // Ausschnitt gefolgt von einem langen zweiten ließ von einer Quelle
+        // nur den kurzen übrig — sie bekam einen Bruchteil ihres Anteils,
+        // während andere ihren vollen behielten. Genau die Ungleichverteilung,
+        // die diese Funktion verhindern soll.
+        if (ausschnitt.length + 1 > rest) {
+          text += ausschnitt.slice(0, rest)
+          break
+        }
         text += ausschnitt + '\n'
-      }
-      // Reicht schon der erste Ausschnitt über das Budget, wird er
-      // abgeschnitten — sonst käme eine Quelle mit sehr langen Abschnitten
-      // gar nicht vor.
-      if (text.length === 0 && quelle.excerpts[0]) {
-        text = quelle.excerpts[0].slice(0, proQuelle)
       }
       return `## ${quelle.title}\n${text.trim()}`
     })
@@ -159,8 +167,17 @@ function tidy(raw: string): string {
         .trim()
         // **Alex:** oder *Alex:* → Alex:
         .replace(/^\*{1,2}([A-Za-zÄÖÜäöü]+)\*{0,2}\s*:\s*\*{0,2}/, '$1: ')
-        // Regieanweisungen: (lacht), [Pause]
-        .replace(/[([][^)\]]{0,60}[)\]]/g, '')
+        // Regieanweisungen: (lacht), [Pause] — und **nur** die.
+        //
+        // Die erste Fassung entfernte jede kurze Klammer. Damit verschwanden
+        // auch Angaben aus den Quellen: „(2026)", „(21,4 Prozent)",
+        // „(vgl. Anhang)". Ein Überblick, dem still die Jahreszahlen fehlen,
+        // ist schlimmer als einer, in dem einmal „lacht" vorgelesen wird.
+        //
+        // Entfernt wird deshalb nur, was zweifelsfrei keine Angabe ist: ein
+        // einzelnes Wort aus Buchstaben, höchstens zwölf Zeichen, ohne
+        // Ziffern. Alles andere bleibt stehen.
+        .replace(/[([][A-Za-zÄÖÜäöüß]{1,12}[)\]]/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim()
     )

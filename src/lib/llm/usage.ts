@@ -36,16 +36,27 @@ export interface LlmCall {
  * Tausch — der Nutzer verlöre etwas Echtes für eine Statistik.
  */
 export async function logLlmCall(admin: SupabaseClient, call: LlmCall): Promise<void> {
-  const { error } = await admin.from('llm_calls').insert({
-    user_id: call.userId,
-    notebook_id: call.notebookId,
-    kind: call.kind,
-    provider: call.provider,
-    model: call.model,
-    input_tokens: call.inputTokens,
-    output_tokens: call.outputTokens,
-    duration_ms: call.durationMs
-  })
+  // `try`, nicht nur die Fehlerprüfung: supabase-js meldet die meisten Fehler
+  // als `{ error }`, kann aber auch werfen — Netz weg, ungültige URL, ein
+  // abgebrochener Fetch. Eine geworfene Ausnahme aus der Buchführung riss
+  // sonst den ganzen Lauf mit: Im Audio-Überblick hätte sie nach der
+  // Vertonung, aber vor dem abschließenden `ready` zugeschlagen und die Zeile
+  // auf `processing` stehen lassen — die teuerste Arbeit getan und trotzdem
+  // verloren.
+  try {
+    const { error } = await admin.from('llm_calls').insert({
+      user_id: call.userId,
+      notebook_id: call.notebookId,
+      kind: call.kind,
+      provider: call.provider,
+      model: call.model,
+      input_tokens: call.inputTokens,
+      output_tokens: call.outputTokens,
+      duration_ms: call.durationMs
+    })
 
-  if (error) console.error('[llm] Aufruf konnte nicht protokolliert werden', error)
+    if (error) console.error('[llm] Aufruf konnte nicht protokolliert werden', error)
+  } catch (fehler) {
+    console.error('[llm] Protokollierung hat geworfen', fehler)
+  }
 }

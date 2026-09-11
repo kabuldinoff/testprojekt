@@ -21,10 +21,19 @@ und die Planung sah vor, den 44-Byte-Header selbst zu schreiben. Nachgemessen: D
 bereits — die Ausgabe beginnt mit `RIFF` und meldet sich als `audio/wav`. Ein Arbeitsschritt, der
 nicht existiert.
 
-**Die Größenrechnung stimmt, die Schlussfolgerung nicht mehr.** Gemessen sind es 2,75 MB je
-Minute. Entscheidend ist aber der Deckel: Drei Minuten sind die Länge, die jemand tatsächlich
-anhört, und damit sind es 8,25 MB je Überblick — rund **120** passen in das Gigabyte, nicht 34.
-Für ein Produkt, das eine Bewerbung begleitet, ist das keine Grenze.
+**Die Größenrechnung stimmt, die Schlussfolgerung nicht mehr.** Und die Einheiten gehören dabei
+sauber getrennt, sonst wird die Kapazitätsplanung zu optimistisch:
+
+24 kHz × 16 Bit × Mono sind **48.000 Byte je Sekunde**, also 2.880.000 Byte je Minute — das sind
+**2,88 MB dezimal** oder **2,75 MiB**. Drei Minuten ergeben 8.640.000 Byte: **8,64 MB** bzw.
+**8,24 MiB**.
+
+Supabase rechnet das Kontingent in dezimalen Einheiten: 1 GB sind 1.000.000.000 Byte, also passen
+**rund 115** dreiminütige Überblicke hinein — nicht 34, wie die Planung mit zehnminütigen
+Überblicken rechnete. Für ein Produkt, das eine Bewerbung begleitet, ist das keine Grenze.
+
+Die Größengrenze des Buckets steht in Byte (`12582912`, also 12 MiB) und lässt damit Spielraum
+über die 8,64 MB hinaus, ohne dass ein Fehler unbegrenzt Platz kostet.
 
 ## Entscheidung
 
@@ -79,8 +88,8 @@ müsste all das erst wieder haben.
 
 ## Konsequenzen
 
-- Ein Überblick belegt bis zu 8,25 MB. Bei einer Größenordnung von hundert Notebooks ist der
-  Speicher der erste Engpass — dann greift die Rechnung oben.
+- Ein Überblick belegt bis zu **8,64 MB** (8,24 MiB). Bei einer Größenordnung von hundert
+  Notebooks ist der Speicher der erste Engpass — dann greift die Rechnung oben.
 - Ausgeliefert wird über Signed URLs mit einer Stunde Gültigkeit. Nicht durch eine Function:
   Vercel begrenzt Antwortkörper auf 4,5 MB, ein dreiminütiger Überblick liegt darüber.
 - Die Modell-ID der Sprachausgabe ist eine Preview-Version und steht in `GEMINI_TTS_MODEL`.

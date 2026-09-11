@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
+import { mitServerAction } from './lib/actions'
 import { uniqueEmail } from './lib/supabase'
 
 /**
@@ -65,6 +66,24 @@ test('aus den Quellen entsteht ein zweistimmiger Überblick mit Transkript', asy
   expect(quelle).toContain('/storage/v1/object/sign/audio/')
   expect(quelle).toContain('token=')
 
+  // Und sie liefert etwas Abspielbares. Die Form der Adresse allein bewiese
+  // das nicht: Eine gültige Signatur auf eine kaputte Datei ließe den Test
+  // bestehen, während niemand den Überblick anhören kann. Geprüft wird
+  // deshalb, was der Browser daraus macht — er liest die Kopfdaten und meldet
+  // eine Dauer.
+  const dauer = await player.evaluate(
+    (el: HTMLAudioElement) =>
+      new Promise<number>((fertig, abbrechen) => {
+        if (el.readyState >= 1) return fertig(el.duration)
+        el.addEventListener('loadedmetadata', () => fertig(el.duration), { once: true })
+        el.addEventListener('error', () => abbrechen(new Error('Audio nicht ladbar')), {
+          once: true
+        })
+        setTimeout(() => abbrechen(new Error('Kopfdaten kamen nicht')), 30_000)
+      })
+  )
+  expect(dauer).toBeGreaterThan(0)
+
   // Das Transkript ist die Textalternative zum Audio und muss beide Stimmen
   // enthalten — ein Gespräch mit einer Stimme wäre ein Vortrag.
   await studio(page).getByText('Transkript').click()
@@ -97,15 +116,48 @@ test('mit Mistral als Anbieter ist der Überblick nicht verfügbar — und sagt 
 }) => {
   await notebookMitQuelle(page)
 
-  await chat(page)
-    .getByRole('radio', { name: /Mistral/ })
-    .check()
+  // Auf die Server Action warten, nicht auf die sichtbare Änderung: Die
+  // Anbieterwahl zeigt sich optimistisch sofort, steht aber erst nach der
+  // Antwort in der Datenbank. Ohne dieses Warten las die Route noch
+  // `gemini` und antwortete mit 202 statt 409.
+  await mitServerAction(page, async () => {
+    await chat(page)
+      .getByRole('radio', { name: /Mistral/ })
+      .check()
+  })
   await expect(chat(page).getByText(/Vollständig in der EU/)).toBeVisible()
 
   // Kein deaktivierter Knopf ohne Erklärung: Die Sperre kommt aus
   // `capabilities.tts` in der Registry, und der Text nennt den Grund und den
   // Weg zurück.
   await expect(studio(page).getByRole('button', { name: /Überblick/ })).toHaveCount(0)
+  await expect(studio(page).getByText(/braucht Google Gemini/)).toBeVisible()
+})
+
+test('mit Mistral lehnt auch die Route direkt ab, nicht nur die Oberfläche', async ({ page }) => {
+  // Der Weg an der Oberfläche vorbei. Eine ausgegraute Schaltfläche ist keine
+  // Grenze: Stünde das Notebook auf Mistral und die Route vertonte trotzdem,
+  // gingen die Quellen an Google — während der Nutzer die Zusage
+  // „Vollständig in der EU" vor sich hat.
+  const notebookId = await notebookMitQuelle(page)
+  // Auf die Server Action warten, nicht auf die sichtbare Änderung: Die
+  // Anbieterwahl zeigt sich optimistisch sofort, steht aber erst nach der
+  // Antwort in der Datenbank. Ohne dieses Warten las die Route noch
+  // `gemini` und antwortete mit 202 statt 409.
+  await mitServerAction(page, async () => {
+    await chat(page)
+      .getByRole('radio', { name: /Mistral/ })
+      .check()
+  })
+  await expect(chat(page).getByText(/Vollständig in der EU/)).toBeVisible()
+
+  const antwort = await page.request.post('/api/studio/audio', { data: { notebookId } })
+  expect(antwort.status()).toBe(409)
+  expect(await antwort.text()).toContain('nicht verfügbar')
+
+  // Und es wurde nichts angelegt — der Überblick darf nicht als „läuft"
+  // zurückbleiben.
+  await page.reload()
   await expect(studio(page).getByText(/braucht Google Gemini/)).toBeVisible()
 })
 

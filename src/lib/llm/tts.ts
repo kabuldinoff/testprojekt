@@ -10,7 +10,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateSpeech } from 'ai'
 
-import { aiEnv } from '@/lib/env'
+import { aiEnv, ttsEnv } from '@/lib/env'
 import { SPEAKERS, type Speaker } from '@/lib/studio/script'
 
 /**
@@ -51,7 +51,7 @@ export async function speak(script: string): Promise<SpokenAudio> {
     model: createGoogleGenerativeAI({
       apiKey: env.googleApiKey,
       ...(env.googleBaseUrl ? { baseURL: env.googleBaseUrl } : {})
-    }).speech(env.geminiTtsModel),
+    }).speech(ttsEnv().model),
     text: script,
     providerOptions: {
       google: {

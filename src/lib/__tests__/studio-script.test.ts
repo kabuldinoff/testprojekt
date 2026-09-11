@@ -44,6 +44,17 @@ describe('checkScript · was durchgeht', () => {
     expect(r.script).toBe('Alex: Die Marge stieg.\nSam: Erstaunlich.')
   })
 
+  it('lässt Angaben in Klammern stehen', () => {
+    // Der wichtigere Fall. Eine zu großzügige Regel löschte Jahreszahlen,
+    // Prozentangaben und Verweise aus den Quellen — ein Überblick, dem still
+    // die Zahlen fehlen, ist schlimmer als einer, in dem einmal „lacht"
+    // vorgelesen wird.
+    const eingabe =
+      'Alex: Im Berichtsjahr (2026) stieg sie um 3,2 Punkte (21,4 Prozent).\n' +
+      'Sam: Und laut Anhang (vgl. Seite 9) bleibt das so.'
+    expect(checkScript(eingabe).script).toBe(eingabe)
+  })
+
   it('entfernt Code-Zäune und Leerzeilen', () => {
     const r = checkScript('```\nAlex: Eins.\n\n\nSam: Zwei.\n```')
     expect(r.ok).toBe(true)
@@ -78,7 +89,16 @@ describe('checkScript · was abgewiesen wird', () => {
 
   it('lehnt ein leeres Skript ab', () => {
     expect(checkScript('   \n\n  ').problem).toBe('leer')
-    expect(checkScript('(nur eine Regieanweisung)').problem).toBe('leer')
+    // Eine Zeile, die nur aus einer Regieanweisung besteht, bleibt nach dem
+    // Aufräumen leer und fällt weg.
+    expect(checkScript('(lacht)').problem).toBe('leer')
+  })
+
+  it('behandelt eine Klammer mit mehreren Wörtern als Text, nicht als Anweisung', () => {
+    // Sie wird nicht entfernt — und fällt dann zu Recht durch die Formprüfung,
+    // statt still zu verschwinden. Lieber eine Meldung als ein Skript, aus dem
+    // unbemerkt etwas herausgefallen ist.
+    expect(checkScript('(nur eine Regieanweisung)').problem).toBe('zeile-ohne-sprecher')
   })
 
   it('lehnt ein zu langes Skript ab', () => {
@@ -125,6 +145,19 @@ describe('buildSourceDigest', () => {
     ])
     expect(d).toContain('## Riesig')
     expect(d.length).toBeGreaterThan(1000)
+  })
+
+  it('füllt den Rest des Budgets, statt einen zu großen Ausschnitt zu verwerfen', () => {
+    // Der Fall aus dem Review: ein kurzer Ausschnitt, dann ein sehr langer.
+    // Die erste Fassung brach nach dem kurzen ab, und die Quelle bekam einen
+    // Bruchteil ihres Anteils, während andere ihren vollen behielten.
+    const d = buildSourceDigest([
+      { title: 'Gemischt', excerpts: ['Kurz.', 'z'.repeat(MAX_CONTEXT_CHARS * 2)] }
+    ])
+    expect(d).toContain('Kurz.')
+    // Der lange Ausschnitt ist angeschnitten vertreten, nicht verworfen.
+    expect(d.length).toBeGreaterThan(MAX_CONTEXT_CHARS / 2)
+    expect(d.length).toBeLessThanOrEqual(MAX_CONTEXT_CHARS + 100)
   })
 
   it('liefert für keine Quellen einen leeren Text', () => {

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { PROVIDERS, type ProviderId } from '@/lib/llm/registry'
+import { formatDuration } from '@/lib/studio/format'
 import { parseScript } from '@/lib/studio/script'
 
 /**
@@ -20,6 +21,17 @@ import { parseScript } from '@/lib/studio/script'
  * nie fertig wird.
  */
 
+/**
+ * Wie oft nachgefragt wird, solange etwas läuft.
+ *
+ * Drei Sekunden sind der Kompromiss zwischen zwei Ärgernissen: Ein längerer
+ * Abstand lässt einen fertigen Überblick sekundenlang als „wird erzeugt"
+ * dastehen; ein kürzerer erzeugt bei einem Lauf von rund einer Minute
+ * dutzende Serveranfragen, die jedes Mal die ganze Seite neu rendern.
+ *
+ * Bei etwa einer Minute Laufzeit sind das ungefähr zwanzig Anfragen — genug,
+ * dass die Anzeige zügig umspringt, wenig genug, dass es nicht auffällt.
+ */
 const POLL_MS = 3000
 
 export interface AudioOverviewItem {
@@ -29,6 +41,8 @@ export interface AudioOverviewItem {
   errorMessage: string | null
   /** Signierte Adresse, vom Server erzeugt. Nur bei `ready` gesetzt. */
   audioUrl: string | null
+  /** Gesetzt, wenn der Überblick da ist, aber nicht ausgeliefert werden kann. */
+  loadProblem: 'signatur' | null
 }
 
 const LAEUFT = new Set(['pending', 'processing'])
@@ -37,15 +51,19 @@ export function AudioOverview({
   notebookId,
   overview,
   provider,
-  hasReadySource
+  hasReadySource,
+  loadFailed
 }: {
   notebookId: string
   overview: AudioOverviewItem | null
   provider: ProviderId
   hasReadySource: boolean
+  /** Die Abfrage selbst ist gescheitert — nicht zu verwechseln mit „es gibt keinen". */
+  loadFailed: boolean
 }) {
   const router = useRouter()
   const [fehler, setFehler] = useState<string | null>(null)
+  const [neustartFehler, setNeustartFehler] = useState(false)
   const [sendet, setSendet] = useState(false)
   const angestossen = useRef(false)
 
@@ -68,11 +86,27 @@ export function AudioOverview({
   useEffect(() => {
     if (status !== 'pending' || angestossen.current) return
     angestossen.current = true
-    void fetch('/api/studio/audio', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ notebookId })
-    }).catch(() => {})
+
+    // Scheitert das Anstoßen, muss es sichtbar werden. Sonst bleibt der
+    // Überblick auf `pending`, die Oberfläche fragt weiter nach, und der
+    // Knopf ist deaktiviert, weil „läuft" — der Nutzer sitzt vor einem
+    // Ladebalken ohne jede Handlungsmöglichkeit.
+    void (async () => {
+      try {
+        const antwort = await fetch('/api/studio/audio', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ notebookId })
+        })
+        // 409 heißt „läuft schon" und ist hier kein Problem, sondern der
+        // Normalfall bei zwei offenen Tabs.
+        if (!antwort.ok && antwort.status !== 409) {
+          setNeustartFehler(true)
+        }
+      } catch {
+        setNeustartFehler(true)
+      }
+    })()
   }, [status, notebookId])
 
   const kannVertonen = PROVIDERS[provider].capabilities.tts
@@ -80,6 +114,7 @@ export function AudioOverview({
   async function erzeugen() {
     setSendet(true)
     setFehler(null)
+    setNeustartFehler(false)
     angestossen.current = true
     try {
       const antwort = await fetch('/api/studio/audio', {
@@ -119,16 +154,46 @@ export function AudioOverview({
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" size="compact" onClick={erzeugen} disabled={sendet || laeuft}>
+          <Button
+            type="button"
+            size="compact"
+            onClick={erzeugen}
+            disabled={sendet || (laeuft && !neustartFehler)}
+          >
             {laeuft ? 'Wird erzeugt …' : overview ? 'Neu erzeugen' : 'Audio-Überblick erzeugen'}
           </Button>
-          {laeuft ? (
+          {laeuft && !neustartFehler ? (
             <span aria-live="polite" className="text-sm text-muted-ink">
               Skript schreiben und vertonen dauert etwa eine Minute.
             </span>
           ) : null}
         </div>
       )}
+
+      {loadFailed ? (
+        <p
+          role="alert"
+          className="mt-3 rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+        >
+          Der Stand des Überblicks konnte nicht geladen werden. Bitte die Seite neu laden.
+        </p>
+      ) : null}
+
+      {overview?.loadProblem === 'signatur' ? (
+        <p
+          role="alert"
+          className="mt-3 rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+        >
+          Der Überblick ist fertig, die Audiodatei ließ sich aber nicht ausliefern. Das Transkript
+          steht unten; ein Neuladen der Seite behebt es meist.
+        </p>
+      ) : null}
+
+      {neustartFehler ? (
+        <p role="alert" className="mt-3 text-sm text-err">
+          Der Überblick konnte nicht fortgesetzt werden. Bitte erneut versuchen.
+        </p>
+      ) : null}
 
       {fehler ? (
         <p role="alert" className="mt-3 text-sm text-err">
@@ -160,7 +225,9 @@ export function AudioOverview({
         <figure className="mt-4">
           <figcaption className="mb-2 text-xs text-muted-ink">
             Zweistimmiger Überblick
-            {overview.durationSeconds ? ` · ${formatDauer(overview.durationSeconds)}` : ''}
+            {overview.durationSeconds
+              ? ` · ${formatDuration(overview.durationSeconds)} Minuten`
+              : ''}
           </figcaption>
           {/*
             Das eingebaute Bedienelement des Browsers, nicht ein eigenes.
@@ -168,7 +235,13 @@ export function AudioOverview({
             die Wiedergabegeschwindigkeit — alles Dinge, die eine
             nachgebaute Leiste erst wieder haben müsste.
           */}
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- Das Transkript steht vollständig darunter und ist die Textalternative. */}
+          {/*
+            Ohne <track>: Eine WebVTT-Spur wäre die formale Textalternative,
+            aber das Transkript steht vollständig und sprecherweise darunter —
+            lesbar, durchsuchbar und kopierbar. Untertitel zu einer reinen
+            Audiodatei ohne Bild hätten dagegen keine Fläche, auf der sie
+            erschienen.
+          */}
           <audio controls preload="metadata" src={overview.audioUrl} className="w-full" />
         </figure>
       ) : null}
@@ -188,10 +261,4 @@ export function AudioOverview({
       ) : null}
     </div>
   )
-}
-
-function formatDauer(sekunden: number): string {
-  const m = Math.floor(sekunden / 60)
-  const s = sekunden % 60
-  return `${m}:${String(s).padStart(2, '0')} Minuten`
 }
