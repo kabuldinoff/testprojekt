@@ -114,9 +114,15 @@ pnpm format           Prettier schreiben
   in `globals.css`, die der Theme-Umschalter braucht, um ohne State auszukommen.
 - **Dark ist der Default**, auch für Erstbesucher. Die Landing Page wird gegen `#0E1424`
   entworfen und gemessen, nicht gegen Weiß.
-- **Gold (`--accent`) ist Akzent, nicht Zweitfarbe** — erlaubt an genau drei Stellen: aktives
-  Zitat-Highlight, „Quelle bereit"-Badge, Studio-Akzentlinie. Ohne diese Grenze wird aus einem
-  Akzent innerhalb von zwei Wochen eine zweite Primärfarbe.
+- **Gold (`--accent`) ist Akzent, nicht Zweitfarbe** — erlaubt an genau **vier** Stellen: aktives
+  Zitat-Highlight, „Quelle bereit"-Badge, Studio-Akzentlinie und das **„N" im Markenzeichen** in
+  der dunklen Ausprägung (`--mark-ink`). Ohne diese Grenze wird aus einem Akzent innerhalb von
+  zwei Wochen eine zweite Primärfarbe.
+
+  Die vierte kam später dazu und ist eine bewusste Erweiterung, keine Aufweichung: Ein
+  Markenzeichen ist der Ort, an dem ein Akzent hingehört. Die Aufzählung bleibt abschließend —
+  wer eine fünfte braucht, ändert zuerst diese Zeile.
+
 - **Jeder Zustand hat eine Darstellung**: leer, ladend, fehlgeschlagen. Jeder Fehler nennt den
   Grund und bietet genau eine Handlung an. Nie „Etwas ist schiefgelaufen". Eine
   Sackgassen-Fehlermeldung ist ein Fehler, kein Schönheitsmangel.

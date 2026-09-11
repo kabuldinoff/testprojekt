@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Wordmark } from '@/components/wordmark'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth/actions'
 import { createClient } from '@/lib/supabase/server'
@@ -47,9 +47,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-canvas">
       <header className="flex items-center gap-4 border-b border-hairline bg-surface px-5 py-3">
-        <Link href="/app" className="font-bold tracking-tight">
-          Notabene
-        </Link>
+        <Wordmark href="/app" />
         <span className="flex-1" />
         <span className="hidden text-sm text-muted-ink sm:inline">{user.email}</span>
         <ThemeToggle />

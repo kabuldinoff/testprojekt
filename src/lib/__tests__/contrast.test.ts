@@ -57,6 +57,16 @@ const PAIRS: Array<{ where: string; foreground: string; background: string; thre
     threshold: AA_NORMAL
   },
 
+  // Das Markenzeichen. Die Fläche ist in beiden Ausprägungen dieselbe dunkle
+  // Farbe, nur der Buchstabe wechselt — im Dunkeln Gold, im Hellen Blau. Ein
+  // einzelner großer Buchstabe fällt unter AA_LARGE.
+  {
+    where: 'Buchstabe im Markenzeichen',
+    foreground: '--mark-ink',
+    background: '--mark-bg',
+    threshold: AA_LARGE
+  },
+
   // Der Fall, der diesen Test ausgelöst hat.
   {
     where: 'Knopfschrift auf Primär',

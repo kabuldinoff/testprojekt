@@ -71,6 +71,18 @@
      keiner. */
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-pop: 0 8px 16px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.45);
+
+  /* Das Markenzeichen: das „N" als Plakette, wie das Symbol im Browser-Tab.
+     Die Fläche ist in beiden Ausprägungen dieselbe dunkle Farbe — so sieht
+     das Zeichen überall gleich aus, egal auf welchem Grund es sitzt. Nur der
+     Buchstabe wechselt: im Dunkeln Gold, im Hellen das Blau aus dem
+     Tab-Symbol. Siehe CLAUDE.md, Gold-Disziplin. */
+  --mark-bg: #0e1424;
+  /* Derselbe Wert wie --accent, ausgeschrieben statt als var(): Der
+     Kontrast-Test liest die Tokens als Text aus dieser Datei und kann eine
+     Verschachtelung nicht auflösen. Ein Verweis, den die Prüfung nicht
+     nachvollziehen kann, wäre eine ungeprüfte Farbe. */
+  --mark-ink: #faef70; /* = --accent · 15.42:1 auf --mark-bg */
 }
 
 /* ── LIGHT — überschreibt den Default ────────────────────────────────────── */
@@ -109,6 +121,12 @@
 
   --shadow-card: 0 1px 2px rgb(14 20 36 / 0.04), 0 8px 24px rgb(14 20 36 / 0.06);
   --shadow-pop: 0 8px 16px rgb(14 20 36 / 0.08), 0 24px 48px rgb(14 20 36 / 0.1);
+
+  /* Fläche bleibt dunkel; der Buchstabe ist hier das Blau aus dem Tab-Symbol
+     (#5B8DEF), nicht das hellere brand-600 dieser Ausprägung — auf dunklem
+     Grund braucht es den helleren Ton. */
+  --mark-bg: #0e1424;
+  --mark-ink: #5b8def;
 }
 
 @theme inline {
@@ -145,6 +163,9 @@
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
 
+  --color-mark-bg: var(--mark-bg);
+  --color-mark-ink: var(--mark-ink);
+
   /* Radien von der Referenzseite: Karte 16, Control 12, Pill rund. */
   --radius-card: 16px;
   --radius-control: 12px;
@@ -171,6 +192,17 @@
     color: var(--ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+
+    /* Etwas mehr Luft zwischen den Wörtern.
+       
+       Plus Jakarta Sans setzt das Leerzeichen eng, und bei zwei kurzen Wörtern
+       hintereinander liest man sie beim Überfliegen als eines. Das fällt vor
+       allem im Deutschen auf, wo zusammengesetzte Wörter ohnehin lang sind und
+       das Auge nach Wortgrenzen sucht.
+       
+       Als Anteil der Schriftgröße, nicht in Pixeln: Der Abstand soll in einer
+       Überschrift mitwachsen, sonst wirkt er dort verschwindend. */
+    word-spacing: 0.08em;
   }
 
   /* Ein sichtbarer Fokusring ist keine Kür. Ohne ihn ist die App per Tastatur

@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { ThemeToggle } from '@/components/theme-toggle'
 import { buttonClasses } from '@/components/ui/button'
+import { Wordmark } from '@/components/wordmark'
 import { PROVIDERS } from '@/lib/llm/registry'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, siteUrl } from '@/lib/site'
 
@@ -98,19 +99,42 @@ export default function Home() {
         />
 
         <header className="mx-auto flex max-w-5xl justify-center px-4 pt-5">
+          {/*
+            Die Leiste ist breit und die Mitte bleibt leer: Links steht, wer
+            man ist, rechts, was man tun kann. Ein zusammengeschobener Block
+            ließe beides gleich wichtig erscheinen.
+
+            Der Umschalter steht direkt beim Zeichen und nicht bei den
+            Einstiegen — er gehört zur Darstellung, nicht zur Handlung.
+
+            Auf schmalen Geräten weicht als Erstes der Wortteil des Zeichens:
+            Die Plakette allein ist wiedererkennbar, weil sie dieselbe ist wie
+            im Browser-Tab. Beide Einstiege bleiben dagegen stehen — sie sind
+            der Zweck der Leiste, und einen davon zu verstecken hieße, jemanden
+            mit Konto den Umweg über die Registrierung gehen zu lassen.
+          */}
           <nav
             aria-label="Hauptnavigation"
-            className="flex items-center gap-3 rounded-pill border border-hairline bg-surface py-2 pr-2 pl-5 shadow-pop sm:gap-5"
+            className="flex w-full max-w-3xl items-center gap-2 rounded-pill border border-hairline bg-surface py-2 pr-2 pl-3 shadow-pop sm:gap-3 sm:pl-4"
           >
-            <span className="font-bold tracking-tight">{SITE_NAME}</span>
+            <Wordmark href="/" hideWordBelowSm />
+            <ThemeToggle />
+            <span className="flex-1" />
             <Link
               href="/anmelden"
-              className="rounded-pill px-2 py-1 text-sm text-muted-ink hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              className="rounded-pill px-2 py-1 text-sm whitespace-nowrap text-muted-ink hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:px-3"
             >
               Anmelden
             </Link>
-            <ThemeToggle />
-            <Link href="/registrieren" className={buttonClasses({ size: 'compact' })}>
+            {/*
+              `whitespace-nowrap`: Ohne das brach die Beschriftung auf schmalen
+              Geräten in zwei Zeilen um, und der Knopf wuchs aus der runden
+              Leiste heraus.
+            */}
+            <Link
+              href="/registrieren"
+              className={buttonClasses({ size: 'compact', className: 'whitespace-nowrap' })}
+            >
               Kostenlos starten
             </Link>
           </nav>
@@ -162,6 +186,31 @@ export default function Home() {
         </section>
 
         {/*
+          Der Audio-Überblick steht zwischen den drei Schritten und dem
+          Datenfluss, weil er beides verbindet: Er ist das, was aus den
+          Quellen entsteht, und er ist der Grund, warum die Anbieterwahl nicht
+          folgenlos ist — vertonen kann nur einer von beiden.
+        */}
+        <section aria-labelledby="audio" className="mt-20">
+          <div className="rounded-card border border-hairline bg-surface p-6 shadow-card sm:p-8">
+            <p className="text-xs font-bold tracking-wide text-accent-ink uppercase">Studio</p>
+            <h2 id="audio" className="mt-2 text-2xl font-extrabold tracking-tight text-balance">
+              Lieber <span className="font-serif italic text-muted-ink">hören</span> als lesen
+            </h2>
+            <p className="mt-3 max-w-[62ch] text-muted-ink">
+              Aus den ausgewählten Quellen entsteht ein zweistimmiges Gespräch, das die Kernpunkte
+              durchgeht — etwa eine Minute, zum Anhören unterwegs. Das Transkript steht daneben,
+              sprecherweise und zum Mitlesen.
+            </p>
+            <p className="mt-3 max-w-[62ch] text-sm text-muted-ink">
+              Auch hier gilt die Regel des Hauses: Gesprochen wird nur, was in den Quellen steht.
+              Und wenn die Sprachausgabe einmal nicht verfügbar ist, bekommen Sie den Text trotzdem
+              — statt eines Ladebalkens, der nie fertig wird.
+            </p>
+          </div>
+        </section>
+
+        {/*
           Der Abschnitt, der dieses Produkt von einem Chatfenster
           unterscheidet. Die Sätze kommen aus derselben Registry, aus der auch
           das Datenfluss-Panel in der Anwendung liest — damit auf der
@@ -191,13 +240,18 @@ export default function Home() {
       </div>
 
       <footer className="border-t border-hairline">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-sm text-muted-ink">
-          <span className="font-bold text-ink">{SITE_NAME}</span>
-          <span>{SITE_TAGLINE}</span>
-          <span className="flex-1" />
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-8 text-sm text-muted-ink">
+          <Wordmark href="/" />
+          {/*
+            Auf schmalen Geräten rutscht die Zeile unter das Zeichen und nimmt
+            die ganze Breite; „Anmelden" bleibt dadurch oben auf Höhe des
+            Zeichens. Vorher brach alles der Reihe nach um, und der Einstieg
+            landete als dritte Zeile unter einem Fließtext.
+          */}
+          <span className="order-last w-full sm:order-none sm:w-auto">{SITE_TAGLINE}</span>
           <Link
             href="/anmelden"
-            className="hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            className="ml-auto rounded-control hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
             Anmelden
           </Link>
