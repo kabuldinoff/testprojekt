@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
+import { mitServerAction } from './lib/actions'
 import { uniqueEmail } from './lib/supabase'
 
 /**
@@ -66,28 +67,18 @@ test('der Anbieterwechsel ändert die Datenfluss-Aussage und überlebt das Neula
   await expect(chat(page).getByRole('radio', { name: /Google Gemini/ })).toBeChecked()
   await expect(chat(page).getByText(/Ihre Quellen werden in der EU indexiert/)).toBeVisible()
 
-  // Auf die Antwort der Server Action warten, nicht auf ein Indiz.
-  //
-  // Die erste Fassung wartete darauf, dass das Fieldset wieder bedienbar ist.
-  // Das war unzuverlässig: `toBeEnabled()` kann sofort zutreffen, weil das
-  // Feld anfangs bedienbar *ist* — die Prüfung lief dann durch, bevor die
-  // Übertragung überhaupt begonnen hatte, und das Neuladen wurde zum Wettlauf.
-  // Die Server Action schickt ein POST an dieselbe Adresse; darauf lässt sich
-  // eindeutig warten.
-  const gespeichert = page.waitForResponse(
-    (antwort) => antwort.request().method() === 'POST' && antwort.url() === page.url()
-  )
-
-  await chat(page)
-    .getByRole('radio', { name: /Mistral/ })
-    .check()
+  // Auf die Antwort der Server Action warten, nicht auf ein Indiz — siehe
+  // `mitServerAction`.
+  await mitServerAction(page, async () => {
+    await chat(page)
+      .getByRole('radio', { name: /Mistral/ })
+      .check()
+  })
 
   // Die Aussage muss sich mit ändern. Eine Auswahl ohne sichtbare Folge wäre
   // eine Einstellung, deren Bedeutung niemand kennt.
   await expect(chat(page).getByText(/Vollständig in der EU/)).toBeVisible()
   await expect(chat(page).getByText(/Ihre Quellen werden in der EU indexiert/)).toHaveCount(0)
-
-  expect((await gespeichert).status()).toBe(200)
 
   // Das ist der Punkt: eine Einstellung, die nur im Browser steht, behauptet
   // einen Datenweg, den der Server nicht geht.

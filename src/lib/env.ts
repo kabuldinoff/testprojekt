@@ -160,3 +160,29 @@ export function aiEnv() {
     mistralBaseUrl: providerBaseUrl('MISTRAL_BASE_URL', process.env.MISTRAL_BASE_URL)
   } as const
 }
+
+/**
+ * Die Sprachausgabe — getrennt von `aiEnv()`, und das ist nachgemessen.
+ *
+ * Zuerst stand `GEMINI_TTS_MODEL` in `aiEnv()`. Die Folge: Fehlte die
+ * Variable, scheiterte nicht die Sprachausgabe, sondern das **Einbetten** —
+ * mit der Meldung „Umgebungsvariable GEMINI_TTS_MODEL fehlt". Jede Quelle
+ * blieb hängen, und die Meldung zeigte auf eine Funktion, die mit der Ursache
+ * nichts zu tun hat.
+ *
+ * In CI ist genau das passiert, weil dort kein `.env.local` liegt, aus dem
+ * der Wert lokal stillschweigend kam.
+ *
+ * Eine Prüfung, die mehr verlangt als der Aufrufer braucht, verwandelt eine
+ * fehlende Einstellung in einen Ausfall an anderer Stelle. Deshalb fragt jede
+ * Funktion nur nach dem, was sie benutzt.
+ *
+ * Die TTS-Modelle sind samt und sonders Preview-Versionen und können
+ * zurückgezogen werden — bei diesem Modelltyp ist die Variable nicht nur
+ * Vorsicht, sondern absehbar nötig.
+ */
+export function ttsEnv() {
+  return {
+    model: required('GEMINI_TTS_MODEL', process.env.GEMINI_TTS_MODEL)
+  } as const
+}

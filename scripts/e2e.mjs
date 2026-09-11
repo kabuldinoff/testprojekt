@@ -51,6 +51,7 @@ function testEnv() {
     MISTRAL_API_KEY: 'stub',
     GEMINI_CHAT_MODEL: 'stub-chat',
     MISTRAL_CHAT_MODEL: 'stub-chat',
+    GEMINI_TTS_MODEL: 'stub-tts',
     GOOGLE_BASE_URL: `${STUB_URL}/v1beta`,
     MISTRAL_BASE_URL: `${STUB_URL}/v1`
   }

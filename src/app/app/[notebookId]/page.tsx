@@ -19,6 +19,7 @@ import { cache } from 'react'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { ProviderSwitch } from '@/components/chat/provider-switch'
 import { NotesPanel, type NoteItem } from '@/components/notes/notes-panel'
+import { AudioOverview, type AudioOverviewItem } from '@/components/studio/audio-overview'
 import { NotebookDelete } from '@/components/notebook-delete'
 import type { StoredMessage } from '@/lib/chat/ui'
 import { providerOrDefault } from '@/lib/llm/registry'
@@ -41,6 +42,16 @@ import { createClient } from '@/lib/supabase/server'
  * bekäme „gibt es nicht" für etwas, das es sehr wohl gibt, und würde es nie
  * wieder aufrufen.
  */
+/**
+ * Gültigkeit der signierten Audio-Adresse.
+ *
+ * Eine Stunde: lang genug, dass ein Überblick zu Ende gehört werden kann —
+ * auch mit Pausen und Zurückspringen —, und kurz genug, dass eine
+ * weitergegebene Adresse nicht dauerhaft trägt. Die Seite wird bei jedem
+ * Aufruf serverseitig gerendert, eine neue Adresse kostet also nichts.
+ */
+const AUDIO_URL_TTL_SECONDS = 3600
+
 const loadNotebook = cache(async (notebookId: string) => {
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -129,6 +140,49 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
 
   const notes: NoteItem[] = (noteRows ?? []) as NoteItem[]
 
+  // Der Audio-Überblick. `maybeSingle`, weil es höchstens einen je Notebook
+  // gibt — das erzwingt die Eindeutigkeitsbedingung in Migration 0011.
+  const { data: overviewRow, error: overviewError } = await supabase
+    .from('audio_overviews')
+    .select('status, script, duration_seconds, error_message, storage_path')
+    .eq('notebook_id', notebook.id)
+    .maybeSingle<{
+      status: AudioOverviewItem['status']
+      script: string | null
+      duration_seconds: number | null
+      error_message: string | null
+      storage_path: string | null
+    }>()
+
+  // Die Adresse wird hier signiert und nicht im Client geholt: Der Bucket ist
+  // privat, und eine Function darf die Datei nicht durchreichen — Vercel
+  // begrenzt Antwortkörper auf 4,5 MB, ein dreiminütiger Überblick ist rund
+  // 8 MiB groß.
+  let audioUrl: string | null = null
+  let signierFehler = false
+  if (overviewRow?.status === 'ready' && overviewRow.storage_path) {
+    const { data: signed, error: signError } = await supabase.storage
+      .from('audio')
+      .createSignedUrl(overviewRow.storage_path, AUDIO_URL_TTL_SECONDS)
+
+    // Ein fehlgeschlagenes Signieren still zu übergehen ergäbe einen fertigen
+    // Überblick ohne Player und ohne Erklärung — der Nutzer sähe ein
+    // Transkript und fragte sich, wo das Audio ist.
+    signierFehler = signError !== null || !signed?.signedUrl
+    audioUrl = signed?.signedUrl ?? null
+  }
+
+  const overview: AudioOverviewItem | null = overviewRow
+    ? {
+        status: overviewRow.status,
+        script: overviewRow.script,
+        durationSeconds: overviewRow.duration_seconds,
+        errorMessage: overviewRow.error_message,
+        audioUrl,
+        loadProblem: signierFehler ? 'signatur' : null
+      }
+    : null
+
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
   // verstecktes Formularfeld zu schreiben, wo der Client sie ändern könnte.
   const update = updateNotebook.bind(null, notebook.id)
@@ -205,6 +259,19 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
             history={history}
           />
         )}
+      </section>
+
+      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-studio">
+        <h2 id="abschnitt-studio" className="text-base font-bold">
+          Studio
+        </h2>
+        <AudioOverview
+          notebookId={notebook.id}
+          overview={overview}
+          loadFailed={overviewError !== null}
+          provider={providerOrDefault(notebook.chat_provider).id}
+          hasReadySource={sources.some((s) => s.status === 'ready')}
+        />
       </section>
 
       <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-notizen">

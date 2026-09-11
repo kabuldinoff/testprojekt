@@ -56,6 +56,14 @@ const PERMITTED: Array<{ file: string; reason: string }> = [
       'Die Verarbeitung läuft in after(), also nach der Antwort. Dort ist der Request beendet ' +
       'und das Sitzungs-Token kann während eines bis zu fünf Minuten langen Laufs ablaufen. ' +
       'Die Route prüft den Besitz vorher über den RLS-Client; erst danach übernimmt der Worker.'
+  },
+  {
+    file: 'app/api/studio/audio/route.ts',
+    reason:
+      'Derselbe Zuschnitt wie die Ingest-Route: Skript und Vertonung laufen in after() und ' +
+      'dauern zusammen bis zu anderthalb Minuten. Die Route prüft den Besitz über den ' +
+      'RLS-Client und legt die Anforderung ebenfalls darüber an; erhöhte Rechte hat erst der ' +
+      'Worker dahinter.'
   }
 ]
 
@@ -143,7 +151,10 @@ describe('der service-role-Client bleibt unerreichbar', () => {
   it('die Ausnahmeliste enthält genau das, was sie enthalten soll', () => {
     // Damit das Hinzufügen einer Ausnahme eine bewusste Änderung an zwei
     // Stellen ist und nicht nur ein stiller Eintrag in einer Liste.
-    expect(PERMITTED.map((p) => p.file)).toEqual(['app/api/sources/[sourceId]/ingest/route.ts'])
+    expect(PERMITTED.map((p) => p.file)).toEqual([
+      'app/api/sources/[sourceId]/ingest/route.ts',
+      'app/api/studio/audio/route.ts'
+    ])
     for (const { file, reason } of PERMITTED) {
       expect(statSync(resolve(SRC, file)).isFile(), `${file} existiert nicht mehr`).toBe(true)
       expect(reason.length, `${file} hat keine Begründung`).toBeGreaterThan(60)
