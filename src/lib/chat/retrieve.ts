@@ -39,6 +39,24 @@ interface MatchRow {
   score: number
 }
 
+/**
+ * Ob die Auswahl überhaupt etwas treffen kann.
+ *
+ * Ein leeres Array heißt „keine Quelle ausgewählt" und liefert garantiert
+ * nichts — das steht schon in der Bedingung der Suchfunktion. Ohne diese
+ * Prüfung würde die Frage trotzdem erst eingebettet: ein Aufruf beim
+ * Anbieter, dessen Ergebnis niemand benutzt. Schlimmer als die verbrauchten
+ * Token ist der Fehlerpfad — schlägt das Einbetten fehl, antwortet die Route
+ * mit 502, obwohl „dazu steht nichts in den ausgewählten Quellen" die
+ * richtige und vollständig bestimmbare Antwort gewesen wäre.
+ *
+ * Als eigene Funktion, weil die Entscheidung ohne I/O fällt und damit prüfbar
+ * sein soll.
+ */
+export function selectsNothing(sourceIds: string[] | null): boolean {
+  return sourceIds !== null && sourceIds.length === 0
+}
+
 export interface Retrieval {
   chunks: RetrievedChunk[]
   /** Für das Verbrauchsprotokoll: das Einbetten der Frage kostet auch etwas. */
@@ -58,6 +76,8 @@ export async function retrieveChunks(
   question: string,
   sourceIds: string[] | null
 ): Promise<Retrieval> {
+  if (selectsNothing(sourceIds)) return { chunks: [], embedTokens: 0 }
+
   const { vector, tokens } = await embedQuery(question)
 
   const { data, error } = await supabase.rpc('match_chunks', {

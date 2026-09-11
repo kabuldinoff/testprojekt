@@ -71,6 +71,12 @@ alter table public.source_chunks
   add column fts tsvector
   generated always as (to_tsvector('german'::regconfig, content)) stored;
 
+-- GIN, weil der lexikalische Zweig der Suche mit `@@` gegen diese Spalte
+-- prüft — genau die Abfrageform, für die GIN gebaut ist. Ohne ihn liest jede
+-- Frage die größte Tabelle des Projekts vollständig.
+--
+-- Er kommt sofort und der Vektor-Index nicht: dieser hier ist exakt, billig
+-- und kann die Trefferliste nicht stillschweigend verkürzen.
 create index source_chunks_fts_idx on public.source_chunks using gin (fts);
 
 -- ── Warum hier kein Vektor-Index steht ─────────────────────────────────────

@@ -6,8 +6,13 @@ import { useMemo, useState } from 'react'
 
 import { Answer } from '@/components/chat/answer'
 import { Button } from '@/components/ui/button'
-import type { Citation } from '@/lib/chat/citations'
-import { sourcesOf, textOf, type NotabeneMessage } from '@/lib/chat/ui'
+import {
+  sourcesOf,
+  storedToUi,
+  textOf,
+  type NotabeneMessage,
+  type StoredMessage
+} from '@/lib/chat/ui'
 
 /**
  * Der Chat eines Notebooks: Quellenauswahl, Verlauf, Eingabe.
@@ -33,13 +38,6 @@ export interface ChatSource {
   title: string
   /** Nur `ready` ist durchsuchbar — der Rest hat keine Abschnitte. */
   status: string
-}
-
-export interface StoredMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  citations: Citation[]
 }
 
 export function ChatPanel({
@@ -85,39 +83,41 @@ export function ChatPanel({
     void sendMessage({ text }, { body: { notebookId, question: text, sourceIds: aktiveIds } })
   }
 
-  if (bereit.length === 0) {
-    return (
-      <p className="rounded-control border border-hairline bg-surface-2 px-4 py-3 text-sm text-muted-ink">
-        Sobald eine Quelle verarbeitet ist, können Sie hier Fragen dazu stellen.
-      </p>
-    )
-  }
+  // Kein früher Rückgabepfad mehr. Die erste Fassung blendete bei null
+  // bereiten Quellen alles aus — auch den gespeicherten Verlauf. Wer die
+  // letzte Quelle löscht, verlöre damit sämtliche früheren Antworten samt
+  // ihren Belegen, obwohl die Passagen in der Nachricht gespeichert sind und
+  // weiterhin lesbar wären. Gesperrt wird deshalb nur das, was ohne Quelle
+  // nicht geht: Auswahl und Eingabe.
+  const fragbar = bereit.length > 0
 
   return (
     <div className="flex flex-col gap-4">
-      <fieldset className="rounded-control border border-hairline bg-surface px-4 py-3">
-        <legend className="px-1 text-xs font-semibold text-muted-ink">
-          Worauf geantwortet wird
-        </legend>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {bereit.map((s) => (
-            <label key={s.id} className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                className="size-4 accent-[var(--brand-600)]"
-                checked={ausgewaehlt === null || ausgewaehlt.has(s.id)}
-                onChange={() => toggle(s.id)}
-              />
-              {s.title}
-            </label>
-          ))}
-        </div>
-        {aktiveIds !== null && aktiveIds.length === 0 ? (
-          <p className="mt-2 text-xs text-warn">
-            Keine Quelle ausgewählt — es gibt nichts, worauf geantwortet werden könnte.
-          </p>
-        ) : null}
-      </fieldset>
+      {fragbar ? (
+        <fieldset className="rounded-control border border-hairline bg-surface px-4 py-3">
+          <legend className="px-1 text-xs font-semibold text-muted-ink">
+            Worauf geantwortet wird
+          </legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {bereit.map((s) => (
+              <label key={s.id} className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[var(--brand-600)]"
+                  checked={ausgewaehlt === null || ausgewaehlt.has(s.id)}
+                  onChange={() => toggle(s.id)}
+                />
+                {s.title}
+              </label>
+            ))}
+          </div>
+          {aktiveIds !== null && aktiveIds.length === 0 ? (
+            <p className="mt-2 text-xs text-warn">
+              Keine Quelle ausgewählt — es gibt nichts, worauf geantwortet werden könnte.
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       {/*
         aria-live="polite" ist bei einer strömenden Antwort keine Zutat,
@@ -159,52 +159,39 @@ export function ChatPanel({
         </p>
       ) : null}
 
-      <form onSubmit={absenden} className="flex items-end gap-2">
-        <label htmlFor="frage" className="sr-only">
-          Frage an die ausgewählten Quellen
-        </label>
-        <textarea
-          id="frage"
-          rows={2}
-          value={frage}
-          onChange={(e) => setFrage(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter sendet, Umschalt+Enter macht einen Absatz. Die
-            // Alternative — Enter macht immer einen Absatz — kostet bei einem
-            // Chat jeden Absendevorgang einen Mausweg.
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              absenden(e)
-            }
-          }}
-          placeholder="Was möchten Sie wissen?"
-          className="min-h-16 flex-1 resize-y rounded-control border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        />
-        <Button type="submit" disabled={laeuft || frage.trim().length === 0}>
-          {laeuft ? 'Antwortet …' : 'Fragen'}
-        </Button>
-      </form>
+      {fragbar ? (
+        <form onSubmit={absenden} className="flex items-end gap-2">
+          <label htmlFor="frage" className="sr-only">
+            Frage an die ausgewählten Quellen
+          </label>
+          <textarea
+            id="frage"
+            rows={2}
+            value={frage}
+            onChange={(e) => setFrage(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sendet, Umschalt+Enter macht einen Absatz. Die
+              // Alternative — Enter macht immer einen Absatz — kostet bei einem
+              // Chat jeden Absendevorgang einen Mausweg.
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                absenden(e)
+              }
+            }}
+            placeholder="Was möchten Sie wissen?"
+            className="min-h-16 flex-1 resize-y rounded-control border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          />
+          <Button type="submit" disabled={laeuft || frage.trim().length === 0}>
+            {laeuft ? 'Antwortet …' : 'Fragen'}
+          </Button>
+        </form>
+      ) : (
+        <p className="rounded-control border border-hairline bg-surface-2 px-4 py-3 text-sm text-muted-ink">
+          {history.length === 0
+            ? 'Sobald eine Quelle verarbeitet ist, können Sie hier Fragen dazu stellen.'
+            : 'Dieses Notebook hat derzeit keine verarbeitete Quelle. Der bisherige Verlauf bleibt lesbar; neue Fragen sind erst wieder möglich, wenn eine Quelle bereit ist.'}
+        </p>
+      )}
     </div>
   )
-}
-
-/**
- * Übersetzt eine gespeicherte Nachricht in die Form, die `useChat` erwartet.
- *
- * Die Belege reisen im selben Datenteil wie bei einer frisch geströmten
- * Antwort. Dadurch stellt `Answer` beide Fälle mit demselben Code dar — es
- * gibt keinen „alte Nachricht"-Zweig, der veralten könnte.
- */
-function storedToUi(m: StoredMessage): NotabeneMessage {
-  return {
-    id: m.id,
-    role: m.role,
-    parts:
-      m.role === 'assistant'
-        ? [
-            { type: 'data-sources', data: m.citations },
-            { type: 'text', text: m.content }
-          ]
-        : [{ type: 'text', text: m.content }]
-  }
 }

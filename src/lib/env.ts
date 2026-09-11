@@ -52,6 +52,51 @@ export function isAcceptableSupabaseUrl(raw: string): boolean {
   return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'
 }
 
+/**
+ * Ob eine übergebene Anbieter-Adresse benutzt werden darf.
+ *
+ * `GOOGLE_BASE_URL` und `MISTRAL_BASE_URL` lenken die SDK-Aufrufe um — und
+ * die SDKs schicken den API-Schlüssel mit. Eine Umgebung, in der eine dieser
+ * Variablen versehentlich oder böswillig auf einen fremden Host zeigt, würde
+ * also die Schlüssel dorthin ausliefern, während die Anwendung scheinbar
+ * normal weiterläuft.
+ *
+ * Der Zweck der Variablen ist der Test-Stub, und der läuft immer auf dem
+ * eigenen Rechner. Erlaubt sind deshalb ausschließlich Loopback-Adressen.
+ * Damit kann eine Fehlkonfiguration die Anfragen bestenfalls ins Leere
+ * lenken, aber nichts nach außen tragen.
+ *
+ * Exportiert, weil die Regel ohne Umgebung prüfbar sein soll.
+ */
+export function isAcceptableProviderBaseUrl(raw: string): boolean {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+  return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'
+}
+
+/**
+ * Prüft eine gesetzte Anbieter-Adresse und wirft, wenn sie nach außen zeigt.
+ *
+ * Wirft statt still zu ignorieren: eine übergangene Einstellung wäre in der
+ * Entwicklung eine Stunde Fehlersuche, und im Betrieb möchte man von einer
+ * solchen Variablen überhaupt erfahren.
+ */
+function providerBaseUrl(name: string, value: string | undefined): string | undefined {
+  if (!value) return undefined
+  if (!isAcceptableProviderBaseUrl(value)) {
+    throw new Error(
+      `${name} darf nur auf eine Loopback-Adresse zeigen — die Variable existiert für den ` +
+        `Test-Stub, und die SDKs schicken den API-Schlüssel an diese Adresse. Gesetzt ist: ${value}`
+    )
+  }
+  return value
+}
+
 /** Im Browser und auf dem Server verfügbar. Enthält nichts Geheimes. */
 export function publicEnv() {
   const supabaseUrl = required('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL)
@@ -111,7 +156,7 @@ export function aiEnv() {
     // aber die Eigenschaft, an der dieses Produkt hängt. Dazu käme, dass
     // jeder CI-Lauf echtes Kontingent verbrauchte und echte Schlüssel in
     // einem öffentlichen Repo lägen. Siehe scripts/ai-stub.mjs.
-    googleBaseUrl: process.env.GOOGLE_BASE_URL,
-    mistralBaseUrl: process.env.MISTRAL_BASE_URL
+    googleBaseUrl: providerBaseUrl('GOOGLE_BASE_URL', process.env.GOOGLE_BASE_URL),
+    mistralBaseUrl: providerBaseUrl('MISTRAL_BASE_URL', process.env.MISTRAL_BASE_URL)
   } as const
 }

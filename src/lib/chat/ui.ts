@@ -44,3 +44,36 @@ export function textOf(message: NotabeneMessage): string {
     .map((p) => p.text)
     .join('')
 }
+
+/** Eine Nachricht, wie sie in der Datenbank steht. */
+export interface StoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  citations: Citation[]
+}
+
+/**
+ * Übersetzt eine gespeicherte Nachricht in die Form, die `useChat` erwartet.
+ *
+ * Die Belege reisen im selben Datenteil wie bei einer frisch geströmten
+ * Antwort. Dadurch stellt die Oberfläche beide Fälle mit demselben Code dar —
+ * es gibt keinen „alte Nachricht"-Zweig, der veralten könnte.
+ *
+ * Steht hier und nicht in der Komponente, weil die Umwandlung ohne I/O
+ * entscheidbar ist: eine reine Funktion mit einem Test daneben. In der
+ * Komponente wäre sie nur über einen gerenderten Baum prüfbar.
+ */
+export function storedToUi(m: StoredMessage): NotabeneMessage {
+  return {
+    id: m.id,
+    role: m.role,
+    parts:
+      m.role === 'assistant'
+        ? [
+            { type: 'data-sources', data: m.citations },
+            { type: 'text', text: m.content }
+          ]
+        : [{ type: 'text', text: m.content }]
+  }
+}

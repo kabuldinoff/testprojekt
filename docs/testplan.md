@@ -14,8 +14,13 @@ Prüfpunkt zugeordnet werden kann.
 | b1  | `e2e/b1-notebook-crud.spec.ts` | Anlegen aus dem Leerzustand, Titel aus Leerraum abgelehnt, Umbenennen wirkt in Detail und Liste, Löschen braucht einen zweiten Schritt, fremdes Notebook ergibt **404**                                                                   |
 | b2  | `e2e/b2-upload-ingest.spec.ts` | Eingefügter Text und hochgeladene Datei laufen bis `bereit` durch; ein unlesbares PDF scheitert **sofort** statt nach drei Versuchen; eine Adresse im lokalen Netz wird abgelehnt; eine fremde Quelle lässt sich weder anlegen noch lesen |
 
-Geplant, in der Reihenfolge der Umsetzung: `b2-upload-ingest`, `b3-chat-citations`, `b4-audio-overview`, `c1-responsive`, `c2-a11y`,
+| b3 | `e2e/b3-chat-citations.spec.ts` | Antwort mit anklickbarem Beleg, und die angezeigte Passage ist die, auf der sie beruht; ein erfundener Beleg verschwindet; ohne ausgewählte Quelle wird nicht geantwortet; der Verlauf übersteht das Neuladen samt Belegen; ein fremdes Notebook ergibt **404** |
+
+Geplant, in der Reihenfolge der Umsetzung: `b4-audio-overview`, `c1-responsive`, `c2-a11y`,
 `d1-landing-seo`, `d2-design-tokens`.
+
+> `b3` läuft gegen einen Stub statt gegen Google und Mistral (`docs/adr/0006`). Der Weg zu den
+> echten Anbietern ist deshalb nur von Hand abgedeckt — siehe die Punkte 6 bis 12 unten.
 
 Dazu Vitest über die reinen Funktionen in `src/lib/`; `pnpm verify` führt Formatprüfung, Lint,
 Typen und Unit-Tests nacheinander aus.

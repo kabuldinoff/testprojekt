@@ -58,14 +58,76 @@ function testEnv() {
 
 const env = testEnv()
 
-// Der Stub läuft neben Build und Tests. `unref()` wäre falsch — er soll leben,
-// solange dieser Prozess lebt, und mit ihm sterben.
-const stub = spawn('node', ['scripts/ai-stub.mjs'], {
-  stdio: 'inherit',
-  env: { ...env, AI_STUB_PORT: String(STUB_PORT) }
-})
+/**
+ * Startet den Stub und wartet, bis er wirklich antwortet.
+ *
+ * `spawn()` bestätigt nur, dass ein Prozess entstanden ist — nicht, dass er
+ * `server.listen` erreicht hat. Ist Port 54430 belegt, endet der Stub mit
+ * EADDRINUSE, während Build und Playwright munter weiterlaufen: die Tests
+ * scheitern dann an „connection refused" an einer Stelle, die mit der
+ * Ursache nichts zu tun hat. Schlimmer noch, wenn der Port von etwas anderem
+ * belegt ist — dann gingen die Anfragen an einen fremden Dienst.
+ *
+ * Deshalb wird auf eine echte Antwort gewartet, und ein vorzeitiges Ende des
+ * Stubs beendet den ganzen Lauf.
+ */
+async function startStub() {
+  const stub = spawn('node', ['scripts/ai-stub.mjs'], {
+    stdio: 'inherit',
+    env: { ...env, AI_STUB_PORT: String(STUB_PORT) }
+  })
+
+  let beendet = false
+  stub.on('exit', (code) => {
+    beendet = true
+    // Nur melden, wenn wir ihn nicht selbst beendet haben.
+    if (!aufraeumen) {
+      console.error(`\nDer AI-Stub ist unerwartet beendet (Code ${code}).`)
+      console.error(`Meist ist Port ${STUB_PORT} belegt: lsof -i :${STUB_PORT}\n`)
+      process.exit(1)
+    }
+  })
+  stub.on('error', (fehler) => {
+    beendet = true
+    console.error(`\nDer AI-Stub ließ sich nicht starten: ${fehler.message}\n`)
+    process.exit(1)
+  })
+
+  // Höchstens zehn Sekunden. Der Stub hat keine Abhängigkeiten und ist
+  // normalerweise nach Millisekunden da; braucht er länger, stimmt etwas
+  // anderes nicht, und Warten hilft dann auch nicht.
+  const frist = Date.now() + 10_000
+  while (Date.now() < frist) {
+    if (beendet) process.exit(1)
+    try {
+      // Ein Pfad, den der Stub kennt. Antwortet dort etwas anderes als
+      // erwartet, ist der Port fremdbesetzt — auch das soll auffallen.
+      const antwort = await fetch(`${STUB_URL}/v1/embeddings`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'mistral-embed', input: ['bereit?'] })
+      })
+      const daten = await antwort.json()
+      if (Array.isArray(daten.data) && daten.data[0]?.embedding?.length === 1024) return stub
+
+      console.error(`\nAuf Port ${STUB_PORT} antwortet etwas, das nicht der AI-Stub ist.\n`)
+      process.exit(1)
+    } catch {
+      await new Promise((weiter) => setTimeout(weiter, 100))
+    }
+  }
+
+  console.error(`\nDer AI-Stub war nach 10 s nicht erreichbar (${STUB_URL}).\n`)
+  process.exit(1)
+}
+
+// Merkt sich, dass ein Ende gewollt ist — sonst meldete der exit-Handler des
+// Stubs beim regulären Aufräumen einen Fehler.
+let aufraeumen = false
+const stub = await startStub()
 
 function beenden(code) {
+  aufraeumen = true
   stub.kill()
   process.exit(code)
 }

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { asUser, createUser, uniqueEmail } from './lib/supabase'
+import { uniqueEmail } from './lib/supabase'
 
 /**
  * b3 — Chat mit Belegen.
@@ -132,18 +132,43 @@ test('der Verlauf übersteht das Neuladen samt Belegen', async ({ page }) => {
   await expect(page.getByRole('figure')).toContainText(KERNSATZ.slice(0, 40))
 })
 
-test('ein fremdes Notebook lässt sich nicht befragen', async ({ page, request }) => {
+test('ein fremdes Notebook lässt sich nicht befragen', async ({ page, browser }) => {
   const notebookId = await notebookMitQuelle(page)
 
-  // Zweiter Nutzer, gültiges Token, direkter Aufruf der Route — der Weg, den
-  // ein Angreifer nähme, wenn die Oberfläche ihm den Knopf nicht anbietet.
-  const mallory = await createUser(request, 'mallory')
-  const alsMallory = asUser(request, mallory)
+  // Zweite Sitzung, eigenes Konto, direkter Aufruf der Route — der Weg, den
+  // jemand nähme, wenn die Oberfläche ihm den Knopf nicht anbietet.
+  //
+  // Der Aufruf geht über `mallory.request`: dieselbe Herkunft und dieselben
+  // Cookies wie die Seite, die Route sieht also eine echte angemeldete
+  // Sitzung. Die erste Fassung benutzte den PostgREST-Helfer aus
+  // `lib/supabase`, und der schickt an `${SUPABASE_URL}/rest/v1/…`. Der Test
+  // bekam damit seinen 404 von PostgREST statt von der Chat-Route und wäre
+  // grün geblieben, wenn die Route fremde Notebooks beantwortet — genau der
+  // Fall, den er ausschließen soll.
+  const kontext = await browser.newContext()
+  const mallory = await kontext.newPage()
+  await mallory.goto('/registrieren')
+  await mallory.getByLabel('E-Mail-Adresse').fill(uniqueEmail('mallory'))
+  await mallory.getByLabel('Passwort').fill(PASSWORD)
+  await mallory.getByRole('button', { name: 'Konto anlegen' }).click()
+  await expect(mallory).toHaveURL(/\/app$/)
 
-  const antwort = await alsMallory.post('/api/chat', {
+  const antwort = await mallory.request.post('/api/chat', {
     data: { notebookId, question: 'Wie hat sich die Marge entwickelt?', sourceIds: null }
   })
 
   // 404 und nicht 403: ein 403 bestätigte, dass es dieses Notebook gibt.
   expect(antwort.status()).toBe(404)
+
+  // Die Gegenprobe: derselbe Aufruf mit dem eigenen Notebook muss durchgehen.
+  // Ohne sie bewiese der 404 oben nur, dass irgendetwas 404 sagt.
+  const eigen = await mallory.request.post('/api/chat', {
+    data: { notebookId: '00000000-0000-0000-0000-000000000000', question: 'x', sourceIds: null }
+  })
+  expect(eigen.status()).toBe(404)
+
+  const ohneAnmeldung = await page.request.post('/api/chat', { data: {} })
+  expect(ohneAnmeldung.status()).toBe(400)
+
+  await kontext.close()
 })

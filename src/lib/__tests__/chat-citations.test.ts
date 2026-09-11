@@ -93,10 +93,44 @@ describe('parseCitations · erfundene Verweise', () => {
     expect(dropped).toBe(1)
   })
 
+  it('lässt eine negative Zahl als Text stehen', () => {
+    // `[-1]` ist kein Beleg, sondern Text — etwa ein Feldindex in einer
+    // zitierten Passage. Der Review wollte das Muster auf Vorzeichen
+    // erweitern, damit die Prüfung greift; das hieße aber, solche Stellen aus
+    // der Antwort zu löschen. Hier festgehalten, damit die Entscheidung
+    // sichtbar ist und nicht wie ein Versehen aussieht.
+    const { text, citations, dropped } = parseCitations('Der Index [-1] zeigt ans Ende.', drei)
+    expect(text).toBe('Der Index [-1] zeigt ans Ende.')
+    expect(citations).toEqual([])
+    expect(dropped).toBe(0)
+  })
+
   it('kommt mit einer leeren Ausschnittsliste zurecht', () => {
     const { text, citations } = parseCitations('Dazu steht nichts in den Quellen [1].', [])
     expect(text).toBe('Dazu steht nichts in den Quellen.')
     expect(citations).toEqual([])
+  })
+})
+
+describe('parseCitations · Leerraum', () => {
+  it('nimmt beim Entfernen das Leerzeichen davor mit', () => {
+    const { text } = parseCitations('Behauptung [9].', drei)
+    expect(text).toBe('Behauptung.')
+  })
+
+  it('lässt Einrückung und Ausrichtung unangetastet', () => {
+    // Die erste Fassung zog hinterher **alle** doppelten Leerzeichen im Text
+    // zusammen. Das zerstörte eingerückte oder ausgerichtete Passagen auch
+    // dann, wenn gar kein Beleg entfernt wurde — und die Antwort wird mit
+    // `whitespace-pre-wrap` dargestellt, der Unterschied ist sichtbar.
+    const eingabe = 'Aufstellung:\n    Umsatz     120\n    Marge       21 [1]'
+    const { text } = parseCitations(eingabe, drei)
+    expect(text).toBe(eingabe)
+  })
+
+  it('erhält die Einrückung auch dort, wo ein Beleg wegfällt', () => {
+    const { text } = parseCitations('Zeile\n    Eingerückt [9]\n    Weiter', drei)
+    expect(text).toBe('Zeile\n    Eingerückt\n    Weiter')
   })
 })
 

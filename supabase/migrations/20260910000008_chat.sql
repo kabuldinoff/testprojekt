@@ -72,13 +72,25 @@ create policy "messages: lesen, was zum eigenen Notebook gehört"
   on public.messages for select to authenticated
   using (public.owns_notebook(notebook_id));
 
+-- Schreiben darf nur, wem das Notebook gehört. `with check` und nicht
+-- `using`: bei INSERT gibt es keine bestehende Zeile zu prüfen, sondern nur
+-- die entstehende. Ohne diese Policy könnte ein angemeldeter Nutzer Fragen
+-- und Antworten in fremde Verläufe schreiben — sichtbar für den Besitzer,
+-- ununterscheidbar von dessen eigenen.
 create policy "messages: schreiben ins eigene Notebook"
   on public.messages for insert to authenticated
   with check (public.owns_notebook(notebook_id));
 
+-- ── Warum es keine UPDATE-Policy gibt ─────────────────────────────────────
 -- Löschen ja, Ändern nein. Ein Gesprächsverlauf, in dem sich Vergangenes
 -- nachträglich ändern lässt, ist als Beleg wertlos — und die Belege sind der
 -- Sinn dieses Produkts. Wer neu anfangen will, löscht.
+--
+-- Die Abwesenheit ist deshalb die Aussage, nicht eine Lücke in der Liste.
+-- Sie wirkt auch zweifach: unten wird `update` gar nicht erst gewährt, der
+-- Versuch scheitert also schon an der Rechteprüfung, bevor RLS befragt wird.
+-- Eine Policy mit `using (false)` wäre unerreichbar und legte nahe, sie täte
+-- etwas.
 create policy "messages: löschen im eigenen Notebook"
   on public.messages for delete to authenticated
   using (public.owns_notebook(notebook_id));
@@ -112,6 +124,9 @@ create table public.llm_calls (
   created_at timestamptz not null default now()
 );
 
+-- Die einzige Abfrage auf dieser Tabelle: „was hat dieser Nutzer zuletzt
+-- verbraucht". Die Spalte, nach der die Policy filtert, steht vorn; die
+-- absteigende Zeit dahinter bedient dieselbe Abfrage ohne Sortierschritt.
 create index llm_calls_user_created_idx on public.llm_calls (user_id, created_at desc);
 
 alter table public.llm_calls enable row level security;
@@ -133,7 +148,13 @@ alter table public.llm_calls enable row level security;
 -- Statistik und gewinnt nichts.
 --
 -- `with check` bindet die Zeile an den Aufrufer: eine fremde user_id lässt
--- sich nicht eintragen. Ein Update gibt es nicht — Geschriebenes bleibt.
+-- sich nicht eintragen.
+--
+-- UPDATE und DELETE gibt es bewusst nicht, und zwar aus demselben Grund wie
+-- bei `messages`: ein Verbrauchsprotokoll, das sich nachträglich umschreiben
+-- oder leeren lässt, beantwortet die Frage nicht mehr, für die es da ist —
+-- „wo ist das Kontingent geblieben". Auch hier greift die Rechteprüfung
+-- zuerst: das `grant` unten nennt nur `select, insert`.
 create policy "llm_calls: die eigenen Aufrufe lesen"
   on public.llm_calls for select to authenticated
   using (user_id = (select auth.uid()));

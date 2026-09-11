@@ -67,8 +67,26 @@ export interface Citation {
  *
  * Bewusst nicht `\[.*?\]`: Markdown-Links (`[Text](…)`) und Fußnoten wären
  * sonst Treffer. Nur Ziffern, Kommas und Leerzeichen zwischen den Klammern.
+ *
+ * Bewusst auch keine Vorzeichen: `[-1]` ist kein Beleg, sondern Text — etwa
+ * ein Feldindex in einer zitierten Passage. Es bleibt deshalb unangetastet
+ * stehen, genau wie `[Platzhalter]`. Ein Muster, das `-1` mitnähme, würde
+ * solche Stellen aus der Antwort löschen. Festgehalten als Test.
  */
 const MARKER = /\[(\d+(?:\s*,\s*\d+)*)\]/g
+
+/**
+ * Dasselbe mit dem Leerraum davor.
+ *
+ * Nur zum Umschreiben, nicht zum Aufteilen: Wird eine erfundene Klammer
+ * entfernt, muss das Leerzeichen davor mit weg, sonst bleibt „Behauptung ."
+ * stehen. Der naheliegende Weg wäre gewesen, hinterher alle doppelten
+ * Leerzeichen im Text zusammenzuziehen — das aber zerstörte Einrückungen und
+ * ausgerichtete Passagen auch dann, wenn gar nichts entfernt wurde. Die
+ * Antwort wird mit `whitespace-pre-wrap` dargestellt, der Unterschied ist
+ * also sichtbar.
+ */
+const MARKER_MIT_VORRAUM = /([ \t]*)(\[\d+(?:\s*,\s*\d+)*\])/g
 
 export interface ParsedAnswer {
   /** Der Antworttext, bereinigt um Verweise, die es nicht gibt. */
@@ -113,15 +131,16 @@ export function rewriteMarkers(
   const used: number[] = []
   let dropped = 0
 
-  const text = answer.replace(MARKER, (_treffer, zahlen: string) => {
+  const text = answer.replace(MARKER_MIT_VORRAUM, (_treffer, vorraum: string, klammer: string) => {
+    const zahlen = klammer.slice(1, -1)
     const nummern = zahlen.split(',').map((z) => Number.parseInt(z.trim(), 10))
     const gueltig = nummern.filter((n) => Number.isInteger(n) && isKnown(n))
 
     dropped += nummern.length - gueltig.length
 
-    // Alle Nummern in dieser Klammer waren erfunden: die Klammer verschwindet
-    // ganz. Ein leeres `[]` stehenzulassen sähe nach einem Darstellungsfehler
-    // aus, und der Satz liest sich ohne sie unverändert.
+    // Alle Nummern in dieser Klammer waren erfunden: die Klammer
+    // verschwindet ganz, samt dem Leerraum davor. Ein leeres `[]` sähe nach
+    // einem Darstellungsfehler aus, und „Behauptung ." nach einem zweiten.
     if (gueltig.length === 0) return ''
 
     for (const n of gueltig) if (!used.includes(n)) used.push(n)
@@ -129,14 +148,10 @@ export function rewriteMarkers(
     // Mehrere Nummern werden zu einzelnen Klammern: die Oberfläche stellt
     // jeden Beleg als eigene anklickbare Schaltfläche dar, und `[2, 3]` wäre
     // eine Schaltfläche, die zwei Stellen gleichzeitig meint.
-    return gueltig.map((n) => `[${n}]`).join('')
+    return vorraum + gueltig.map((n) => `[${n}]`).join('')
   })
 
-  // Doppelte Leerzeichen und Leerzeichen vor Satzzeichen, die durch das
-  // Entfernen entstanden sein können.
-  const bereinigt = text.replace(/ {2,}/g, ' ').replace(/ ([.,;:!?])/g, '$1')
-
-  return { text: bereinigt, used, dropped }
+  return { text, used, dropped }
 }
 
 /**
