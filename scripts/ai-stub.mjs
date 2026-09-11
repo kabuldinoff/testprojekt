@@ -79,6 +79,33 @@ function antwort(prompt) {
   return `Laut den Quellen: ${treffer[1].slice(0, 60)} [1].`
 }
 
+/**
+ * Ein Gesprächsskript, das die Prüfung besteht — oder eines, das sie nicht
+ * besteht, wenn der Quelltext das Stichwort enthält.
+ *
+ * `KAPUTTES SKRIPT` ist der Weg, im Test den Pfad `script_only` und die
+ * Formprüfung zu erreichen. Mit einem echten Modell ließe sich ein falsches
+ * Präfix nicht auf Kommando erzeugen.
+ */
+function skript(prompt) {
+  if (prompt.includes('KAPUTTES SKRIPT')) {
+    return 'Moderator: Das ist kein erlaubter Sprechername.\nGast: Stimmt.'
+  }
+  // Ein gültiges Skript, das die Vertonung unten ablehnen lässt — der Weg zu
+  // `script_only`. Mit einem echten Anbieter ließe sich ein erschöpftes
+  // Tageskontingent nicht auf Kommando herbeiführen, und genau dieser Pfad
+  // ist der, auf den es bei einer Vorführung ankommt.
+  if (prompt.includes('KEIN AUDIO')) {
+    return 'Alex: Das Kontingent ist erschöpft.\nSam: Dann lesen wir eben mit.'
+  }
+  return [
+    'Alex: Der Bericht hat eine klare Botschaft.',
+    'Sam: Nämlich?',
+    'Alex: Die Marge im Dienstleistungssegment stieg von 18,2 auf 21,4 Prozent.',
+    'Sam: Und die Personalkosten blieben unverändert.'
+  ].join('\n')
+}
+
 function readBody(req) {
   return new Promise((resolve) => {
     let roh = ''
@@ -140,6 +167,81 @@ const server = createServer(async (req, res) => {
     )
     res.write('data: [DONE]\n\n')
     res.end()
+    return
+  }
+
+  // ── Google: Sprachausgabe ───────────────────────────────────────────────
+  // Die Sprachausgabe geht über `:generateContent` (nicht strömend) und
+  // erkennt sich an `responseModalities: ['AUDIO']`. Zurück kommt
+  // base64-kodiertes PCM in `inlineData`; das SDK macht daraus ein WAV.
+  //
+  // Der Stub liefert Stille in der Länge, die das echte Modell für diesen
+  // Text brauchte: 24 kHz, 16 Bit, Mono, also 48.000 Byte je Sekunde bei rund
+  // 13,7 Zeichen je Sekunde. Damit prüft der Test die Dauerberechnung und die
+  // Größengrenze des Buckets an realistischen Zahlen, statt an einer
+  // willkürlichen Datei.
+  if (url.pathname.includes(':generateContent')) {
+    const modalitaeten = body.generationConfig?.responseModalities ?? []
+    if (modalitaeten.includes('AUDIO')) {
+      const text = JSON.stringify(body.contents ?? [])
+      // Ein Skript mit falschen Sprechernamen darf hier gar nicht ankommen —
+      // `checkScript` fängt es vorher ab. Kommt es doch, soll der Test das
+      // sehen und nicht stillschweigend Audio bekommen.
+      if (!/Alex:|Sam:/.test(text)) {
+        res.writeHead(400, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: { message: 'Kein Sprecherpräfix im Skript.' } }))
+        return
+      }
+      // Der Weg zu `script_only`: so antwortet ein erschöpftes Kontingent.
+      if (text.includes('Kontingent ist ersch')) {
+        res.writeHead(429, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: { code: 429, message: 'Resource has been exhausted.' } }))
+        return
+      }
+      const sekunden = Math.max(1, Math.min(180, Math.round(text.length / 13.7)))
+      const pcm = Buffer.alloc(48000 * sekunden)
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'audio/L16;codec=pcm;rate=24000',
+                      data: pcm.toString('base64')
+                    }
+                  }
+                ]
+              },
+              finishReason: 'STOP'
+            }
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: sekunden * 25,
+            totalTokenCount: 10 + sekunden * 25
+          }
+        })
+      )
+      return
+    }
+
+    // Nicht strömender Textaufruf — so erzeugt der Studio-Lauf sein Skript.
+    const prompt = JSON.stringify(body.contents ?? [])
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(
+      JSON.stringify({
+        candidates: [
+          { content: { role: 'model', parts: [{ text: skript(prompt) }] }, finishReason: 'STOP' }
+        ],
+        usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 40, totalTokenCount: 60 }
+      })
+    )
     return
   }
 

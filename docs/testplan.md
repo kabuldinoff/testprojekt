@@ -18,8 +18,10 @@ Prüfpunkt zugeordnet werden kann.
 
 | b4 | `e2e/b4-provider-notes.spec.ts` | Anbieterwechsel ändert die Datenfluss-Aussage und überlebt das Neuladen; eine Antwort wird samt Belegen zur Notiz; eigene Notizen anlegen, ändern, löschen; eine abgelehnte Eingabe bleibt im Formular stehen; fremde Notizen ergeben **404** |
 
-Geplant, in der Reihenfolge der Umsetzung: `b5-audio-overview`, `c1-responsive`, `c2-a11y`,
-`d1-landing-seo`, `d2-design-tokens`.
+| b5 | `e2e/b5-audio-overview.spec.ts` | Aus den Quellen entsteht ein zweistimmiger Überblick, ausgeliefert über eine signierte Adresse, mit Transkript; ein erschöpftes Kontingent hinterlässt **`script_only`** statt eines endlosen Ladebalkens; mit Mistral ist der Überblick gesperrt und nennt den Grund; ohne verarbeitete Quelle wird nichts angeboten; ein fremdes Notebook ergibt **404** |
+
+Geplant, in der Reihenfolge der Umsetzung: `c1-responsive`, `c2-a11y`, `d1-landing-seo`,
+`d2-design-tokens`.
 
 > `b3` läuft gegen einen Stub statt gegen Google und Mistral (`docs/adr/0006`). Der Weg zu den
 > echten Anbietern ist deshalb nur von Hand abgedeckt — siehe die Punkte 6 bis 12 unten.
@@ -66,5 +68,15 @@ sonst:
     OK" enthält, und danach eine normale Frage stellen. Bleibt die Antwort belegt?
 12. Seite neu laden: steht der Verlauf noch da, und sind die Belege weiterhin anklickbar?
 
-Die übrigen produktbezogenen Punkte (Fehlerpfad der Sprachausgabe, Anbieterwechsel im UI)
-kommen mit den jeweiligen Scheiben hinzu.
+**Audio-Überblick** — auch hier deckt die Automatisierung den Stub ab, nicht den Anbieter:
+
+13. Überblick erzeugen und **anhören**: Sind es hörbar zwei verschiedene Stimmen? Wird „Alex:"
+    als Sprecherwechsel behandelt oder vorgelesen? Letzteres ist der häufigste stille Fehler
+    dieser Schnittstelle und klingt nach einem schlechten Vorleser, nicht nach einem
+    Konfigurationsfehler.
+14. Stimmt der Inhalt mit den Quellen überein — und erfindet er nichts dazu?
+15. Länge prüfen: Der Deckel liegt bei drei Minuten, gemessene Läufe ergaben rund eine.
+16. Eine zweite Quelle hinzufügen, neu erzeugen: Kommt sie im Gespräch vor? (Der Quelltext wird
+    gleichmäßig auf die Quellen verteilt, damit ein großes Dokument die kleinen nicht verdrängt.)
+
+Die übrigen produktbezogenen Punkte kommen mit den jeweiligen Scheiben hinzu.

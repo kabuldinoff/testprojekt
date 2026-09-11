@@ -147,6 +147,11 @@ export function aiEnv() {
     googleChatModel: required('GEMINI_CHAT_MODEL', process.env.GEMINI_CHAT_MODEL),
     mistralChatModel: required('MISTRAL_CHAT_MODEL', process.env.MISTRAL_CHAT_MODEL),
 
+    // Die TTS-Modelle sind samt und sonders Preview-Versionen und können
+    // zurückgezogen werden — bei diesem Modelltyp ist die Variable also nicht
+    // nur Vorsicht, sondern absehbar nötig.
+    geminiTtsModel: required('GEMINI_TTS_MODEL', process.env.GEMINI_TTS_MODEL),
+
     // Die Naht für die End-to-End-Tests. Im Betrieb nicht gesetzt, dann gilt
     // die Voreinstellung des jeweiligen SDK.
     //

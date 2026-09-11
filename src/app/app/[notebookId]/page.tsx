@@ -19,6 +19,7 @@ import { cache } from 'react'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { ProviderSwitch } from '@/components/chat/provider-switch'
 import { NotesPanel, type NoteItem } from '@/components/notes/notes-panel'
+import { AudioOverview, type AudioOverviewItem } from '@/components/studio/audio-overview'
 import { NotebookDelete } from '@/components/notebook-delete'
 import type { StoredMessage } from '@/lib/chat/ui'
 import { providerOrDefault } from '@/lib/llm/registry'
@@ -129,6 +130,43 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
 
   const notes: NoteItem[] = (noteRows ?? []) as NoteItem[]
 
+  // Der Audio-Überblick. `maybeSingle`, weil es höchstens einen je Notebook
+  // gibt — das erzwingt die Eindeutigkeitsbedingung in Migration 0011.
+  const { data: overviewRow } = await supabase
+    .from('audio_overviews')
+    .select('status, script, duration_seconds, error_message, storage_path')
+    .eq('notebook_id', notebook.id)
+    .maybeSingle<{
+      status: AudioOverviewItem['status']
+      script: string | null
+      duration_seconds: number | null
+      error_message: string | null
+      storage_path: string | null
+    }>()
+
+  // Die Adresse wird hier signiert und nicht im Client geholt: Der Bucket ist
+  // privat, und eine Function darf die Datei nicht durchreichen — Vercel
+  // begrenzt Antwortkörper auf 4,5 MB, ein dreiminütiger Überblick ist rund
+  // 8 MB groß. Eine Stunde Gültigkeit reicht für das Anhören und ist kurz
+  // genug, dass eine weitergegebene Adresse nicht dauerhaft trägt.
+  let audioUrl: string | null = null
+  if (overviewRow?.status === 'ready' && overviewRow.storage_path) {
+    const { data: signed } = await supabase.storage
+      .from('audio')
+      .createSignedUrl(overviewRow.storage_path, 3600)
+    audioUrl = signed?.signedUrl ?? null
+  }
+
+  const overview: AudioOverviewItem | null = overviewRow
+    ? {
+        status: overviewRow.status,
+        script: overviewRow.script,
+        durationSeconds: overviewRow.duration_seconds,
+        errorMessage: overviewRow.error_message,
+        audioUrl
+      }
+    : null
+
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
   // verstecktes Formularfeld zu schreiben, wo der Client sie ändern könnte.
   const update = updateNotebook.bind(null, notebook.id)
@@ -205,6 +243,18 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
             history={history}
           />
         )}
+      </section>
+
+      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-studio">
+        <h2 id="abschnitt-studio" className="text-base font-bold">
+          Studio
+        </h2>
+        <AudioOverview
+          notebookId={notebook.id}
+          overview={overview}
+          provider={providerOrDefault(notebook.chat_provider).id}
+          hasReadySource={sources.some((s) => s.status === 'ready')}
+        />
       </section>
 
       <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-notizen">
