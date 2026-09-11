@@ -94,13 +94,24 @@ test('der Arbeitsbereich ist vom Index ausgenommen', async ({ page }) => {
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
 })
 
-test('das Vorschaubild wird ausgeliefert', async ({ request }) => {
+test('das Vorschaubild wird unter einer absoluten Adresse ausgeliefert', async ({
+  request,
+  baseURL
+}) => {
   const seite = await request.get('/')
   const html = await seite.text()
   const treffer = /<meta property="og:image" content="([^"]+)"/.exec(html)
   expect(treffer, 'og:image fehlt im Kopf').not.toBeNull()
 
-  const bild = await request.get(treffer![1]!)
+  // Absolut, nicht relativ: Diese Adresse wird von fremden Servern gelesen —
+  // Slack, LinkedIn, Suchmaschinen —, und ein `/opengraph-image` ohne Host
+  // zeigt für die auf sich selbst. Das leistet `metadataBase`.
+  const adresse = treffer![1]!
+  expect(adresse).toMatch(/^https?:\/\//)
+  expect(adresse.startsWith(baseURL!)).toBe(true)
+
+  // Und sie liefert wirklich ein Bild. Die Form allein bewiese das nicht.
+  const bild = await request.get(adresse)
   expect(bild.ok()).toBe(true)
   expect(bild.headers()['content-type']).toContain('image/png')
 })

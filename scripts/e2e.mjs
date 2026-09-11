@@ -35,6 +35,21 @@ import { localStackEnv } from './lib/local-stack.mjs'
 const STUB_PORT = 54430
 const STUB_URL = `http://127.0.0.1:${STUB_PORT}`
 
+/**
+ * Muss zu `PORT` in playwright.config.ts passen.
+ *
+ * Gebraucht für `NEXT_PUBLIC_SITE_URL`: Die Anwendung erzeugt daraus absolute
+ * Adressen — das Vorschaubild, die kanonischen Links, die Sitemap. Ohne diese
+ * Variable fällt `siteUrl()` auf `localhost:3000` zurück, und ein Test, der
+ * das Vorschaubild tatsächlich abruft, landet auf einem fremden Port.
+ *
+ * Genau das ist passiert: Lokal war der Test grün, **weil zufällig ein
+ * Entwicklungsserver auf 3000 lief**. In CI gab es keinen, und der Abruf
+ * endete in `ECONNREFUSED`. Ein falsches Grün, das eine unbeteiligte
+ * Hintergrundanwendung erzeugt hat.
+ */
+const APP_PORT = 3100
+
 function testEnv() {
   const stack = localStackEnv()
   return {
@@ -53,7 +68,12 @@ function testEnv() {
     MISTRAL_CHAT_MODEL: 'stub-chat',
     GEMINI_TTS_MODEL: 'stub-tts',
     GOOGLE_BASE_URL: `${STUB_URL}/v1beta`,
-    MISTRAL_BASE_URL: `${STUB_URL}/v1`
+    MISTRAL_BASE_URL: `${STUB_URL}/v1`,
+
+    // Die kanonische Adresse während des Laufs ist der Testserver selbst.
+    // Dadurch prüft `d1-landing-seo` eine absolute Adresse, die auch
+    // tatsächlich erreichbar ist — statt einer, die nur zufällig antwortet.
+    NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${APP_PORT}`
   }
 }
 
