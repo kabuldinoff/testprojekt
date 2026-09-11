@@ -65,6 +65,34 @@ was gleich unwiderruflich passiert.
   vorher unterschiedliche Zugriffsregeln, und ein Test lieferte deshalb lokal `401` und in CI
   `200`.
 
+## Die Region ist keine Kosmetik
+
+`vercel.json` legt `fra1` fest — Frankfurt. Die Datenbank steht in `eu-central-1`, ebenfalls
+Frankfurt. Ohne diese Festlegung landen die Funktionen in der Voreinstellung `iad1` (Virginia),
+und dann kostet **jede einzelne Datenbankabfrage** rund 150 ms Hin- und Rückweg über den
+Atlantik. Eine Seite, die drei Abfragen macht, ist damit eine halbe Sekunde langsamer, ohne dass
+eine Zeile Code schlecht wäre.
+
+Der zweite Grund wiegt für dieses Produkt schwerer: Das Datenfluss-Panel sagt dem Nutzer, dass
+seine Quellen in der EU indexiert werden. Liefe die Anwendung, die diese Daten anfasst, in
+Virginia, wäre die Aussage bestenfalls die halbe Wahrheit.
+
+JSON erlaubt keine Kommentare, deshalb steht die Begründung hier und nicht in der Datei.
+
+## Zuerst ausrollen, dann fertigstellen
+
+Das Deployment wurde bewusst **vorgezogen**, sobald das Produkt vorführbar war — statt es ans
+Ende zu stellen, wo es im Plan stand.
+
+Der Grund ist Risikoverteilung, nicht Ungeduld. Was bei einer Erstinbetriebnahme schiefgeht, hat
+fast nie mit dem Code zu tun: fehlende Umgebungsvariablen, eine Funktionsregion, die nicht zur
+Datenbank passt, Redirect-URLs, die noch auf `localhost` zeigen, ein Build, der lokal läuft und
+dort nicht. Jede dieser Überraschungen ist in zehn Minuten behoben, wenn Zeit ist — und
+unbezahlbar teuer, wenn keine mehr ist.
+
+Der Preis ist, dass das Deployment zweimal angefasst wird. Der zweite Durchgang ist dann aber
+Routine statt Erstinbetriebnahme.
+
 ## Umgebungsvariablen
 
 `.env.example` listet, was gebraucht wird. In Vercel werden dieselben Namen als
@@ -74,6 +102,22 @@ Projektvariablen gesetzt. Zwei Fallen:
   einem neuen Build, nicht nach einem Neustart.
 - `SUPABASE_SECRET_KEY` darf **nie** ein `NEXT_PUBLIC_`-Präfix bekommen. Damit läge er im
   Browser-Bundle und wäre öffentlich.
+
+Nicht gesetzt werden dürfen `GOOGLE_BASE_URL` und `MISTRAL_BASE_URL`. Sie existieren für den
+Test-Stub und lenken die SDK-Aufrufe um — samt API-Schlüssel. `src/lib/env.ts` lässt deshalb nur
+Loopback-Adressen zu und wirft sonst; siehe ADR 0006.
+
+## Was außerhalb dieses Repos eingestellt werden muss
+
+Zwei Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig vergessen:
+
+1. **Supabase → Authentication → URL Configuration.** Die _Site URL_ muss auf die
+   Produktionsadresse zeigen, und `https://<domain>/auth/callback` gehört in die Liste der
+   erlaubten Weiterleitungen. Steht dort noch `localhost`, führt der Bestätigungslink aus der
+   Registrierungs-E-Mail ins Leere — und zwar nur für echte Nutzer, während lokal alles
+   funktioniert.
+2. **Vercel → Settings → Functions.** Die Region muss `fra1` sein. `vercel.json` legt das fest;
+   die Einstellung im Dashboard sollte damit übereinstimmen, sonst ist unklar, welche gilt.
 
 ## Die Datenbank wach halten
 
