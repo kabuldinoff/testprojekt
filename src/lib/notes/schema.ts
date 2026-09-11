@@ -22,6 +22,19 @@ export const NOTE_TITLE_MAX = 200
  */
 export const NOTE_CONTENT_MAX = 20_000
 
+/**
+ * Ab welcher Länge das Kürzen an einer Wortgrenze noch lohnt.
+ *
+ * Liegt die letzte Wortgrenze weit vorn — etwa weil die Antwort mit einem sehr
+ * langen Ausdruck beginnt, einer URL oder einem Dateipfad —, bliebe vom Titel
+ * ein Fragment übrig. Dann ist mitten im Wort abzuschneiden das kleinere Übel:
+ * „Die Zusammenfassung des Quartalsber…" sagt mehr als „Die".
+ *
+ * 40 Zeichen sind rund ein Fünftel der erlaubten Titellänge und in der Praxis
+ * die Grenze, ab der eine Überschrift noch etwas aussagt.
+ */
+const MIN_TITLE_AFTER_CUT = 40
+
 export const noteInput = z.object({
   title: z
     .string()
@@ -37,7 +50,13 @@ export const noteInput = z.object({
 
 export type NoteInput = z.infer<typeof noteInput>
 
-/** Liest die Felder aus einem Formular. */
+/**
+ * Zieht die Felder aus dem Formular und prüft sie in einem Schritt.
+ *
+ * An einer Stelle, weil die Feldnamen sonst an drei Orten stünden: im
+ * Formular, im Anlegen und im Ändern. Ein Tippfehler in einem davon äußerte
+ * sich als „Die Notiz braucht einen Titel", obwohl einer dasteht.
+ */
 export function parseNoteForm(formData: FormData) {
   return noteInput.safeParse({
     title: formData.get('title'),
@@ -75,5 +94,5 @@ export function titleFromAnswer(answer: string): string {
   // Wort in einer Überschrift sieht nach einem Fehler aus.
   const gekuerzt = roh.slice(0, NOTE_TITLE_MAX - 1)
   const letzteLuecke = gekuerzt.lastIndexOf(' ')
-  return (letzteLuecke > 40 ? gekuerzt.slice(0, letzteLuecke) : gekuerzt) + '…'
+  return (letzteLuecke > MIN_TITLE_AFTER_CUT ? gekuerzt.slice(0, letzteLuecke) : gekuerzt) + '…'
 }

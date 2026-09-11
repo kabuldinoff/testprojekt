@@ -3,10 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import type { Citation } from '@/lib/chat/citations'
+import { citationsSchema, type Citation } from '@/lib/chat/citations'
 import { createClient } from '@/lib/supabase/server'
 
-import { parseNoteForm, titleFromAnswer } from './schema'
+import { NOTE_CONTENT_MAX, parseNoteForm, titleFromAnswer } from './schema'
 
 /**
  * Anlegen, Ändern und Löschen von Notizen.
@@ -101,14 +101,32 @@ export async function saveAnswerAsNote(
   content: string,
   citations: Citation[]
 ): Promise<NoteState> {
+  // Eine Server Action ist eine Systemgrenze wie jede andere, und der Typ
+  // `Citation[]` ist zur Laufzeit nicht mehr da. Was hier ankommt, ist JSON —
+  // `[null]` und `[{}]` kämen ungeprüft durch, und die Notizliste liest
+  // anschließend `c.n` und `c.sourceTitle` darauf. Der CHECK in der Migration
+  // prüft nur, dass es ein Array ist.
+  const geprueft = citationsSchema.safeParse(citations)
+  if (!geprueft.success) {
+    return { error: 'Die Belege dieser Antwort sind unvollständig. Bitte erneut fragen.' }
+  }
+
+  // Die Länge wird hier geprüft und nicht der Datenbank überlassen: der CHECK
+  // dort meldet einen Postgres-Fehler, den niemand lesen will. Erreichbar ist
+  // das bei einer sehr langen Antwort tatsächlich.
+  const text = content.trim()
+  if (text.length === 0 || text.length > NOTE_CONTENT_MAX) {
+    return { error: 'Diese Antwort lässt sich nicht als Notiz speichern.' }
+  }
+
   const supabase = await requireSupabase()
 
   const { error } = await supabase.from('notes').insert({
     notebook_id: notebookId,
-    title: titleFromAnswer(content),
-    content,
+    title: titleFromAnswer(text),
+    content: text,
     origin: 'chat',
-    citations
+    citations: geprueft.data
   })
 
   if (error) return { error: 'Die Notiz konnte nicht gespeichert werden.' }
@@ -133,10 +151,16 @@ export async function updateNote(
 
   const supabase = await requireSupabase()
 
+  // Beide Bedingungen, nicht nur die Kennung der Notiz. RLS stellt sicher,
+  // dass die Notiz dem Aufrufer gehört — aber nicht, dass sie zu *diesem*
+  // Notebook gehört. Ohne die zweite Bedingung könnte ein Aufruf eine Notiz
+  // aus Notebook A ändern und dabei Notebook B neu laden lassen: der Nutzer
+  // sähe seine Änderung nirgends und die alte Notiz unverändert.
   const { data, error } = await supabase
     .from('notes')
     .update(parsed.data)
     .eq('id', noteId)
+    .eq('notebook_id', notebookId)
     .select('id')
 
   if (error) {
@@ -156,9 +180,18 @@ export async function deleteNote(
 ): Promise<NoteState> {
   const supabase = await requireSupabase()
 
-  const { error } = await supabase.from('notes').delete().eq('id', noteId)
+  // Wie beim Ändern an beide Kennungen gebunden. Und mit `select`, damit ein
+  // Treffer von null Zeilen unterscheidbar ist: ein Löschen, das nichts traf,
+  // meldete sonst Erfolg, und die Notiz stünde weiterhin da.
+  const { data, error } = await supabase
+    .from('notes')
+    .delete()
+    .eq('id', noteId)
+    .eq('notebook_id', notebookId)
+    .select('id')
 
   if (error) return { error: 'Die Notiz konnte nicht gelöscht werden.' }
+  if (data.length === 0) return { error: 'Diese Notiz gibt es nicht.' }
 
   revalidatePath(`/app/${notebookId}`)
   return { ok: true }

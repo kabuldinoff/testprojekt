@@ -27,6 +27,7 @@ import { z } from 'zod'
 import { parseCitations, type RetrievedChunk } from '@/lib/chat/citations'
 import { SYSTEM_PROMPT, buildContext, buildUserMessage } from '@/lib/chat/prompt'
 import { retrieveChunks } from '@/lib/chat/retrieve'
+import type { NotabeneMessage } from '@/lib/chat/ui'
 import { chatModel } from '@/lib/llm/chat'
 import { providerOrDefault } from '@/lib/llm/registry'
 import { logLlmCall } from '@/lib/llm/usage'
@@ -121,7 +122,11 @@ export async function POST(request: Request): Promise<Response> {
   const { model, modelId } = chatModel(provider.id)
   const begonnen = Date.now()
 
-  const stream = createUIMessageStream({
+  // Typparameter, und der ist nicht kosmetisch: ohne ihn ist `writer.write`
+  // beliebig, und ein fehlendes Feld im Belegteil fällt erst zur Laufzeit auf.
+  // Genau das ist passiert — `chunkIndex` fehlte, während der Typ ihn
+  // versprach, und erst die Prüfung in der Notiz-Action hat es gefunden.
+  const stream = createUIMessageStream<NotabeneMessage>({
     execute({ writer }) {
       // Zuerst die Ausschnitte, dann der Text. Die Oberfläche kann damit
       // jeden Beleg sofort auflösen, während die Antwort noch läuft.
@@ -131,6 +136,7 @@ export async function POST(request: Request): Promise<Response> {
           n: i + 1,
           sourceId: c.sourceId,
           sourceTitle: c.sourceTitle,
+          chunkIndex: c.chunkIndex,
           pageNumber: c.pageNumber,
           charStart: c.charStart,
           charEnd: c.charEnd,

@@ -1,5 +1,6 @@
 'use client'
 
+import { unstable_rethrow } from 'next/navigation'
 import { useId, useState, useTransition } from 'react'
 
 import { PROVIDERS, PROVIDER_IDS, type ProviderId } from '@/lib/llm/registry'
@@ -33,6 +34,18 @@ export function ProviderSwitch({
   const [laeuft, starte] = useTransition()
   const gruppe = useId()
 
+  /**
+   * Nimmt die optimistische Anzeige zurück.
+   *
+   * Eine Anzeige, die eine Einstellung behauptet, die nicht gespeichert wurde,
+   * ist schlimmer als die Fehlermeldung allein: Der Nutzer glaubte dann, seine
+   * Daten gingen einen anderen Weg.
+   */
+  function zuruecksetzen(vorher: ProviderId, meldung: string) {
+    setGewaehlt(vorher)
+    setFehler(meldung)
+  }
+
   function waehlen(id: ProviderId) {
     if (id === gewaehlt) return
     const vorher = gewaehlt
@@ -40,13 +53,24 @@ export function ProviderSwitch({
     setFehler(null)
 
     starte(async () => {
-      const ergebnis = await setChatProvider(notebookId, id)
-      if (ergebnis.error) {
-        // Zurücksetzen. Eine Anzeige, die eine Einstellung behauptet, die nicht
-        // gespeichert wurde, ist schlimmer als die Fehlermeldung allein — der
-        // Nutzer glaubte dann, seine Daten gingen einen anderen Weg.
-        setGewaehlt(vorher)
-        setFehler(ergebnis.error)
+      try {
+        const ergebnis = await setChatProvider(notebookId, id)
+        if (ergebnis.error) zuruecksetzen(vorher, ergebnis.error)
+      } catch (fehler) {
+        // `unstable_rethrow` lässt die Kontrollfluss-Ausnahmen des Frameworks
+        // durch — vor allem das `redirect('/anmelden')` aus der Action, wenn
+        // die Sitzung abgelaufen ist. Würde dieser catch sie schlucken, bliebe
+        // der Nutzer auf einer Seite stehen, die ihm eine Einstellung anzeigt,
+        // während er gar nicht mehr angemeldet ist.
+        unstable_rethrow(fehler)
+
+        // Alles andere ist ein echter Fehlschlag: Netz weg, Server weg. Ohne
+        // diesen Zweig bliebe die optimistische Auswahl stehen und behauptete
+        // einen Datenweg, den es nicht gibt.
+        zuruecksetzen(
+          vorher,
+          'Der Anbieter konnte nicht gewechselt werden. Bitte erneut versuchen.'
+        )
       }
     })
   }

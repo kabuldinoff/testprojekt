@@ -54,6 +54,10 @@ create policy "notes: lesen im eigenen Notebook"
   on public.notes for select to authenticated
   using (public.owns_notebook(notebook_id));
 
+-- `with check` und nicht `using`: beim Einfügen gibt es keine bestehende Zeile
+-- zu prüfen, sondern nur die entstehende. Ohne diese Policy könnte ein
+-- angemeldeter Nutzer Notizen in fremde Notebooks legen — sichtbar für den
+-- Besitzer und nicht von seinen eigenen zu unterscheiden.
 create policy "notes: anlegen im eigenen Notebook"
   on public.notes for insert to authenticated
   with check (public.owns_notebook(notebook_id));
@@ -67,6 +71,9 @@ create policy "notes: ändern im eigenen Notebook"
   using (public.owns_notebook(notebook_id))
   with check (public.owns_notebook(notebook_id));
 
+-- Löschen gehört dazu, anders als bei `messages`: eine Notiz ist etwas, das
+-- der Nutzer selbst angelegt hat und wieder loswerden können muss. Ein
+-- Gesprächsverlauf ist eine Spur, eine Notizsammlung ist ein Arbeitsmittel.
 create policy "notes: löschen im eigenen Notebook"
   on public.notes for delete to authenticated
   using (public.owns_notebook(notebook_id));

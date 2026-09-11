@@ -223,7 +223,14 @@ function Assistant({
   stroemt: boolean
 }) {
   const sources = sourcesOf(message)
-  const { text } = rewriteMarkers(textOf(message), (n) => sources.some((s) => s.n === n))
+  const { text, used } = rewriteMarkers(textOf(message), (n) => sources.some((s) => s.n === n))
+
+  // Nur die Belege, die im Text auch vorkommen. `sources` enthält alle
+  // Ausschnitte, die dem Modell vorlagen — meist mehr, als es zitiert hat.
+  // Landeten sie ungefiltert in der Notiz, führte die Belegliste darunter
+  // Quellen auf, auf denen die Aussage gar nicht beruht. Das ist die
+  // unangenehmste Sorte Fehler in diesem Produkt: er sieht nach Sorgfalt aus.
+  const zitiert = sources.filter((s) => used.includes(s.n))
 
   return (
     <div className="rounded-card border border-hairline bg-surface px-4 py-3">
@@ -234,7 +241,7 @@ function Assistant({
         Satz, der zufällig gerade dastand.
       */}
       {stroemt || text.length === 0 ? null : (
-        <SaveAsNote notebookId={notebookId} content={text} citations={sources} />
+        <SaveAsNote notebookId={notebookId} content={text} citations={zitiert} />
       )}
     </div>
   )

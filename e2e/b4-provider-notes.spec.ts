@@ -66,6 +66,18 @@ test('der Anbieterwechsel ändert die Datenfluss-Aussage und überlebt das Neula
   await expect(chat(page).getByRole('radio', { name: /Google Gemini/ })).toBeChecked()
   await expect(chat(page).getByText(/Ihre Quellen werden in der EU indexiert/)).toBeVisible()
 
+  // Auf die Antwort der Server Action warten, nicht auf ein Indiz.
+  //
+  // Die erste Fassung wartete darauf, dass das Fieldset wieder bedienbar ist.
+  // Das war unzuverlässig: `toBeEnabled()` kann sofort zutreffen, weil das
+  // Feld anfangs bedienbar *ist* — die Prüfung lief dann durch, bevor die
+  // Übertragung überhaupt begonnen hatte, und das Neuladen wurde zum Wettlauf.
+  // Die Server Action schickt ein POST an dieselbe Adresse; darauf lässt sich
+  // eindeutig warten.
+  const gespeichert = page.waitForResponse(
+    (antwort) => antwort.request().method() === 'POST' && antwort.url() === page.url()
+  )
+
   await chat(page)
     .getByRole('radio', { name: /Mistral/ })
     .check()
@@ -75,11 +87,7 @@ test('der Anbieterwechsel ändert die Datenfluss-Aussage und überlebt das Neula
   await expect(chat(page).getByText(/Vollständig in der EU/)).toBeVisible()
   await expect(chat(page).getByText(/Ihre Quellen werden in der EU indexiert/)).toHaveCount(0)
 
-  // Warten, bis die Server Action durch ist. Das Fieldset ist während der
-  // Übertragung deaktiviert — ein beobachtbares Signal. Ohne dieses Warten
-  // lädt der Test die Seite neu, bevor geschrieben wurde, und prüft dann eine
-  // Race Condition statt der Speicherung.
-  await expect(chat(page).getByRole('radio', { name: /Mistral/ })).toBeEnabled()
+  expect((await gespeichert).status()).toBe(200)
 
   // Das ist der Punkt: eine Einstellung, die nur im Browser steht, behauptet
   // einen Datenweg, den der Server nicht geht.
