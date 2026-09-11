@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { uniqueEmail } from './lib/supabase'
+
 /**
  * d1 — die öffentliche Seite und ihre Beiwerke.
  *
@@ -85,12 +87,27 @@ test('llms.txt beschreibt das Produkt und enthält keine Anweisungen', async ({ 
   expect(text).not.toMatch(/ignoriere|ignore all|du musst|you must/i)
 })
 
-test('der Arbeitsbereich ist vom Index ausgenommen', async ({ page }) => {
-  // Ohne Anmeldung landet man auf /anmelden — und auch die darf nicht in den
+test('der Arbeitsbereich ist vom Index ausgenommen — auch angemeldet', async ({ page }) => {
+  // Ohne Anmeldung landet man auf /anmelden, und auch die darf nicht in den
   // Index: sie bringt keinem Suchenden etwas und verwässert, wofür die
   // Startseite gefunden werden soll.
   await page.goto('/app')
   await expect(page).toHaveURL(/\/anmelden/)
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
+
+  // Und jetzt die Seite, um die es eigentlich geht.
+  //
+  // Die erste Fassung endete hier oben — sie prüfte damit ausschließlich die
+  // Anmeldeseite. Fiele das `noindex` im /app-Layout weg, bliebe die
+  // Umleitung bestehen und der Test grün, während der Arbeitsbereich
+  // indexierbar wäre. Ein Test, der genau die Zusage nicht prüft, die er im
+  // Namen trägt.
+  await page.goto('/registrieren')
+  await page.getByLabel('E-Mail-Adresse').fill(uniqueEmail('seo'))
+  await page.getByLabel('Passwort').fill('test-passwort-1234')
+  await page.getByRole('button', { name: 'Konto anlegen' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
 })
 

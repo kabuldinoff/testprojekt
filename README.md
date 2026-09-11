@@ -74,8 +74,11 @@ does not collide.
 
 ## Conventions
 
-- Code, identifiers and commit messages in English. UI text, error messages and test names in
-  German.
+- English for anything that crosses a boundary: exported names, types, file names, database
+  columns, commit messages. German for what stays inside: comments, local identifiers, UI text,
+  error messages and test names. The comments carry the reasoning in this codebase and they are
+  German — a local named `antwort` beside them reads as one voice, `response` as two.
+  `CLAUDE.md` has the long version.
 - Anything decidable without I/O lives in `src/lib/` as a pure function with a unit test next to
   it. Components and route handlers stay orchestration-only.
 - Components use semantic utilities (`bg-surface`, `text-ink`) exclusively — never a hex value

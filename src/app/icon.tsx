@@ -1,5 +1,7 @@
 import { ImageResponse } from 'next/og'
 
+import { BRAND, CANVAS, MARK_RADIUS } from '@/lib/brand'
+
 /**
  * Das Symbol in der Browser-Leiste.
  *
@@ -28,14 +30,15 @@ export default function Icon() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        // --canvas und --brand-600 der dunklen Ausprägung: Dark ist der
-        // Default, und in der Browser-Leiste steht das Symbol meist auf
-        // dunklem Grund.
-        background: '#0E1424',
-        color: '#5B8DEF',
+        // Aus `src/lib/brand.ts` — dieselben Werte wie im Vorschaubild und in
+        // der Wortmarke, und ein Test vergleicht sie mit globals.css. Es sind
+        // die der dunklen Ausprägung: Dark ist der Standard, und in der
+        // Browser-Leiste steht das Symbol meist auf dunklem Grund.
+        background: CANVAS,
+        color: BRAND,
         fontSize: 24,
         fontWeight: 700,
-        borderRadius: 7
+        borderRadius: MARK_RADIUS
       }}
     >
       N

@@ -74,7 +74,10 @@ export async function generateMetadata({
   // Kein notFound() hier: über den Statuscode entscheidet die Seite. Bei einem
   // Abfragefehler wäre ein 404 aus den Metadaten schlicht falsch.
   const title = result.status === 'ok' ? `${result.notebook.title} · Notabene` : 'Notabene'
-  return { title, robots: { index: false, follow: false } }
+  // `robots` steht nicht hier: Das Layout unter src/app/app/ setzt es für
+  // den ganzen Bereich. Vier Seiten, die dasselbe erklären, sind vier
+  // Gelegenheiten, es bei der fünften zu vergessen.
+  return { title }
 }
 
 export default async function NotebookPage({ params }: PageProps<'/app/[notebookId]'>) {

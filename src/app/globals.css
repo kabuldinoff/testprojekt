@@ -23,6 +23,33 @@
    gewinnt die spätere Regel. Stünde der :root-Block hinten, überstimmte er
    jedes .light — der Umschalter täte sichtbar nichts, ohne Fehlermeldung und
    ohne dass irgendein Test rot wird. Genau das ist im Canvas schon passiert. */
+/* ── Maße, die in beiden Ausprägungen gleich sind ─────────────────────────
+   Eigener Block, weil sie **keine** Farben sind: Der Theme-Vertrag
+   (src/lib/__tests__/theme-tokens.test.ts) verlangt, dass `.light` jedes
+   Token aus dem Dark-Block überschreibt. Für Geometrie hieße das, denselben
+   Wert zweimal zu schreiben und damit zu behaupten, er könnte sich
+   unterscheiden. */
+:root {
+  /* Die Ecke der Marken-Plakette: 7 auf 28 Pixel, also ein Viertel. Deutlich
+     abgerundet, ohne ein Kreis zu werden — bei einem einzelnen Buchstaben
+     liest sich ein Kreis als Aufzählung und ein scharfes Quadrat als Fehler.
+     src/lib/brand.ts hält denselben Wert für das Tab-Symbol; ein Test
+     vergleicht beide. */
+  --mark-radius: 7px;
+
+  /* Die Größe, bei der das „N" die Plakette füllt, ohne an den Rand zu
+     stoßen. Fett gesetzt liegt sie damit unter der Schwelle für „großen
+     Text" (18.66px) — der Kontrast wird deshalb gegen die strenge Schwelle
+     geprüft, nicht gegen die lockere. */
+  --mark-text-size: 15px;
+
+  /* Höhe des Verlaufs hinter dem Hero. Der hellste Punkt der Ellipse liegt
+     über dem oberen Rand; nach 560px ist sie vollständig ausgelaufen. Kürzer
+     entsteht eine sichtbare Kante, länger färbt der Verlauf die Karten
+     darunter ein. */
+  --glow-height: 560px;
+}
+
 :root,
 .dark {
   --brand-50: #22304f; /* muss heller als --surface sein, sonst verschwinden
@@ -165,6 +192,8 @@
 
   --color-mark-bg: var(--mark-bg);
   --color-mark-ink: var(--mark-ink);
+  --radius-mark: var(--mark-radius);
+  --text-mark: var(--mark-text-size);
 
   /* Radien von der Referenzseite: Karte 16, Control 12, Pill rund. */
   --radius-card: 16px;

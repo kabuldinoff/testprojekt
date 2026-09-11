@@ -94,7 +94,7 @@ export default function Home() {
         */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px]"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[var(--glow-height)]"
           style={{ background: 'var(--glow)' }}
         />
 

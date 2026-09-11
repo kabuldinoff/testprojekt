@@ -56,7 +56,7 @@ export function Wordmark({
       */}
       <span
         aria-hidden="true"
-        className="grid size-7 shrink-0 place-items-center rounded-[7px] border border-hairline bg-mark-bg text-[15px] leading-none font-extrabold text-mark-ink"
+        className="grid size-7 shrink-0 place-items-center rounded-mark border border-hairline bg-mark-bg text-mark leading-none font-extrabold text-mark-ink"
       >
         N
       </span>

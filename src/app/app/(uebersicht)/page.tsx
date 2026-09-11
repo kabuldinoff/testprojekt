@@ -17,11 +17,10 @@ import { buttonClasses } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Notebooks · Notabene',
+  title: 'Notebooks · Notabene'
   // Der gesamte App-Bereich bleibt aus dem Index. Er ist ohnehin nur
   // angemeldet erreichbar; ein Crawler bekäme die Anmeldeseite zu sehen und
   // würde sie als Duplikat der echten Startseite werten.
-  robots: { index: false, follow: false }
 }
 
 export default async function AppPage() {

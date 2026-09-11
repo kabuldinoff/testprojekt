@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 
+import { BRAND, CANVAS, GLOW, INK, MUTED_INK, SURFACE } from '@/lib/brand'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/site'
 
 /**
@@ -19,13 +20,6 @@ export const alt = `${SITE_NAME} — ${SITE_TAGLINE}`
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-/** Die dunkle Ausprägung der Palette, weil Dark der Default ist. */
-const INK = '#EDF1F7'
-const MUTED = '#A8B0BE'
-const CANVAS = '#0E1424'
-const SURFACE = '#1B2640'
-const BRAND = '#5B8DEF'
-
 export default function OpengraphImage() {
   return new ImageResponse(
     <div
@@ -37,8 +31,9 @@ export default function OpengraphImage() {
         justifyContent: 'center',
         padding: '80px',
         background: CANVAS,
-        // Derselbe Verlauf wie im Hero der Startseite.
-        backgroundImage: `radial-gradient(700px 380px at 50% -10%, rgba(91,141,239,0.45), transparent 60%)`
+        // Derselbe Verlauf wie im Hero der Startseite — aus derselben Quelle,
+        // damit „derselbe" auch stimmt. Hier stand zunächst ein anderes Blau.
+        backgroundImage: GLOW
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -50,7 +45,7 @@ export default function OpengraphImage() {
             background: BRAND
           }}
         />
-        <div style={{ color: MUTED, fontSize: 28, letterSpacing: '0.02em' }}>{SITE_NAME}</div>
+        <div style={{ color: MUTED_INK, fontSize: 28, letterSpacing: '0.02em' }}>{SITE_NAME}</div>
       </div>
 
       <div
@@ -70,7 +65,7 @@ export default function OpengraphImage() {
       <div
         style={{
           marginTop: 28,
-          color: MUTED,
+          color: MUTED_INK,
           fontSize: 30,
           lineHeight: 1.4,
           maxWidth: 860
@@ -87,7 +82,7 @@ export default function OpengraphImage() {
           padding: '12px 22px',
           borderRadius: 999,
           background: SURFACE,
-          color: MUTED,
+          color: MUTED_INK,
           fontSize: 24
         }}
       >

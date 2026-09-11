@@ -58,13 +58,18 @@ const PAIRS: Array<{ where: string; foreground: string; background: string; thre
   },
 
   // Das Markenzeichen. Die Fläche ist in beiden Ausprägungen dieselbe dunkle
-  // Farbe, nur der Buchstabe wechselt — im Dunkeln Gold, im Hellen Blau. Ein
-  // einzelner großer Buchstabe fällt unter AA_LARGE.
+  // Farbe, nur der Buchstabe wechselt — im Dunkeln Gold, im Hellen Blau.
+  //
+  // AA_NORMAL, nicht AA_LARGE: „Großer Text" beginnt bei 18.66px fett, der
+  // Buchstabe steht aber bei 15px (`--text-mark`). Die lockere Schwelle hätte
+  // hier 3:1 erlaubt und damit ein künftiges Farbpaar durchgelassen, das die
+  // Richtlinie verfehlt. Beide aktuellen Werte bestehen die strenge ohnehin
+  // deutlich: 15.42:1 dunkel, 5.68:1 hell.
   {
     where: 'Buchstabe im Markenzeichen',
     foreground: '--mark-ink',
     background: '--mark-bg',
-    threshold: AA_LARGE
+    threshold: AA_NORMAL
   },
 
   // Der Fall, der diesen Test ausgelöst hat.

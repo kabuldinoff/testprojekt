@@ -19,6 +19,12 @@ import { createClient } from '@/lib/supabase/server'
  * ohnehin nur die Weiterleitung zur Anmeldung zu sehen. Die Kette aus
  * Middleware, Layout-Prüfung und RLS entscheidet über Zugriff; diese Zeile
  * entscheidet nur darüber, ob die Anmeldeseite als Suchtreffer auftaucht.
+ *
+ * **Die einzige Stelle.** Zuvor stand dasselbe zusätzlich an drei Seiten. Das
+ * war nicht nur Wiederholung: Es machte diese Zeile wirkungslos und damit
+ * unprüfbar — ein Test konnte nicht zeigen, dass sie etwas tut, weil die
+ * Seiten es ohnehin selbst erklärten. Jetzt trägt das Layout es für den
+ * ganzen Bereich, auch für jede Seite, die später dazukommt.
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false }

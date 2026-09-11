@@ -92,8 +92,22 @@ pnpm format           Prettier schreiben
 
 ## Konventionen
 
-- **Sprache**: Code, Bezeichner, Dateinamen und Commit-Nachrichten Englisch. Deutsch bleiben
-  UI-Texte, Fehlermeldungen, LLM-Prompts und Testnamen.
+- **Sprache**, und zwar genauer als „Code Englisch":
+
+  **Englisch** ist alles, was eine Grenze überschreitet — exportierte Namen, Typen, Dateinamen,
+  Spalten- und Tabellennamen, Commit-Nachrichten. Das ist die Fläche, die jemand liest, der das
+  Projekt nicht kennt, und die sich mit den Werkzeugen und Bibliotheken darum herum mischt.
+
+  **Deutsch** ist alles, was innen bleibt: Kommentare, lokale Bezeichner, UI-Texte,
+  Fehlermeldungen, LLM-Prompts und Testnamen. Die Kommentare tragen in diesem Projekt die
+  Begründungen und sind deutsch; ein `const antwort` daneben liest sich als eine Stimme, ein
+  `const response` als zwei.
+
+  Die vorige Fassung sagte pauschal „Bezeichner Englisch" und beschrieb den Code damit falsch —
+  23 Dateien halten sie nicht ein. Eine Regel, die der Code nicht einhält, ist keine Regel,
+  sondern eine Fußnote, die niemand liest. Korrigiert wurde deshalb die Regel, nicht der Code:
+  Die Umbenennung wäre Bewegung ohne Gewinn, und jede Bewegung im Code ist ein Risiko.
+
 - **Commits**: Conventional Commits, kleingeschrieben, der Betreff beschreibt das _Verhalten_,
   nicht die Datei. Eine Scheibe = ein Commit. Gearbeitet wird auf Branches, gemergt über Pull
   Requests, damit der Review-Verlauf in der Historie steht.
