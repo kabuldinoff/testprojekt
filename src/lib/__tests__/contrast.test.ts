@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { AA_LARGE, AA_NORMAL, contrastRatio, luminance } from '../contrast'
+import { AA_LARGE, AA_NORMAL, composite, contrastRatio, luminance } from '../contrast'
 import { readTokenBlock } from '../theme-tokens'
 
 /**
@@ -192,4 +192,54 @@ describe('die Schwellen sind die aus WCAG 2.1', () => {
     expect(AA_NORMAL).toBe(4.5)
     expect(AA_LARGE).toBe(3)
   })
+})
+
+/**
+ * Die Überschrift über dem Verlauf hinter dem Hero.
+ *
+ * Der Verlauf liegt halbdurchsichtig über `--canvas`. Ein Kontrastwert gegen
+ * `--canvas` allein misst dort einen Untergrund, den es an dieser Stelle nicht
+ * gibt.
+ *
+ * ── Warum nur die Überschrift ─────────────────────────────────────────────
+ *
+ * Geprüft wird die **dichteste** Stelle, also die volle Deckkraft. Das ist für
+ * die Überschrift eine sinnvolle Annahme — sie steht weit oben, wo der Schein
+ * kräftig ist — und für den Fließtext darunter nicht: Der Absatz sitzt bei
+ * rund 335px, und dort ist der Verlauf bereits vollständig ausgelaufen
+ * (Deckkraft 0, also `--muted-ink` auf `--canvas`, und das ist oben geprüft).
+ *
+ * Diese Prüfung auch auf `--muted-ink` anzuwenden, war ein Fehlalarm: Sie
+ * schlug mit 2.86:1 an für eine Farbkombination, die auf der Seite nirgends
+ * entsteht — und hätte erzwungen, die Deckkraft auf 0.12 zu senken, womit vom
+ * Schein nichts übrig bliebe.
+ *
+ * Was diese Rechnung nicht leisten kann, ist die Frage „welcher Text liegt
+ * tatsächlich über welcher Dichte" — das hängt vom Layout ab und gehört in
+ * eine Messung im Browser. `e2e/c2-a11y` wird sie übernehmen; dort lässt sich
+ * die gerenderte Farbe hinter einem Element auslesen, statt sie zu rechnen.
+ */
+describe('Überschrift über dem Verlauf', () => {
+  for (const [name, block] of Object.entries(themes)) {
+    describe(`Palette: ${name}`, () => {
+      const glow = block?.tokens.get('--glow') ?? ''
+      const treffer = /rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\s*\)/.exec(glow)
+
+      it('--glow ist lesbar', () => {
+        expect(treffer, `--glow nicht auswertbar: ${glow}`).not.toBeNull()
+      })
+
+      it('bleibt an der dichtesten Stelle lesbar', () => {
+        const [, r, g, b, a] = treffer!
+        const hex = '#' + [r, g, b].map((v) => Number(v).toString(16).padStart(2, '0')).join('')
+        const grund = composite(block!.tokens.get('--canvas')!, hex, Number(a))
+        const wert = contrastRatio(block!.tokens.get('--ink')!, grund)
+
+        expect(
+          wert,
+          `--ink auf ${grund} (Verlauf über --canvas) erreicht nur ${wert.toFixed(2)}:1`
+        ).toBeGreaterThanOrEqual(AA_NORMAL)
+      })
+    })
+  }
 })

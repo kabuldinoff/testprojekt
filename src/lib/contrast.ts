@@ -38,3 +38,35 @@ export function contrastRatio(a: string, b: string): number {
   const [heller, dunkler] = [luminance(a), luminance(b)].sort((x, y) => y - x)
   return (heller! + 0.05) / (dunkler! + 0.05)
 }
+
+/**
+ * Legt eine halbdurchsichtige Farbe über eine deckende und gibt das Ergebnis
+ * als Hex-Wert zurück.
+ *
+ * Gebraucht für den Verlauf hinter dem Hero: Er liegt als `rgb(… / alpha)`
+ * über `--canvas`, und der Text darauf muss auch an seiner dichtesten Stelle
+ * lesbar bleiben. Ein Kontrastwert gegen `--canvas` allein wäre dort zu
+ * optimistisch — er misst einen Untergrund, den es an dieser Stelle nicht
+ * gibt.
+ *
+ * Die gewöhnliche Alpha-Überblendung, nicht die wahrnehmungsrichtige:
+ * Browser mischen so, und geprüft wird, was der Browser zeigt.
+ */
+export function composite(background: string, overlay: string, alpha: number): string {
+  const kanaele = (hex: string) => {
+    const wert = hex.trim().replace('#', '')
+    if (!/^[0-9a-fA-F]{6}$/.test(wert)) throw new Error(`Kein sechsstelliger Hex-Wert: ${hex}`)
+    return [0, 2, 4].map((i) => parseInt(wert.slice(i, i + 2), 16))
+  }
+
+  const unten = kanaele(background)
+  const oben = kanaele(overlay)
+
+  return (
+    '#' +
+    [0, 1, 2]
+      .map((i) => Math.round(unten[i]! * (1 - alpha) + oben[i]! * alpha))
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')
+  )
+}

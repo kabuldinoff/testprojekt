@@ -44,10 +44,14 @@ export const MARK_RADIUS = 7
 /**
  * Der Verlauf hinter dem Hero und im Vorschaubild.
  *
- * Die Geometrie stammt aus `--glow` in `globals.css`: eine Ellipse von 700
- * auf 380 Pixeln, mittig und leicht über den oberen Rand hinaus, damit der
- * hellste Punkt außerhalb des Bildes liegt und der sichtbare Teil gleichmäßig
- * abfällt.
+ * Die Geometrie stammt aus `--glow` in `globals.css` — aus der **dunklen**
+ * Ausprägung: eine Ellipse von 700 auf 380 Pixeln, mittig und leicht über den
+ * oberen Rand hinaus, damit der hellste Punkt außerhalb des Bildes liegt und
+ * der sichtbare Teil gleichmäßig abfällt. Ein Vorschaubild hat kein Theme,
+ * dem es folgen könnte, und Dark ist der Standard.
+ *
+ * Der helle Modus benutzt dieselbe Farbe bei weiterem Auslauf; das ist für
+ * das Vorschaubild ohne Belang, steht aber in globals.css begründet.
  *
  * Die Farbe ist dieselbe wie dort. Beim Schreiben stand hier zunächst
  * `--brand-600` der dunklen Ausprägung statt der Farbe aus `--glow` — die

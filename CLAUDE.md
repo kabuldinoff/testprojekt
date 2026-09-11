@@ -128,14 +128,17 @@ pnpm format           Prettier schreiben
   in `globals.css`, die der Theme-Umschalter braucht, um ohne State auszukommen.
 - **Dark ist der Default**, auch für Erstbesucher. Die Landing Page wird gegen `#0E1424`
   entworfen und gemessen, nicht gegen Weiß.
-- **Gold (`--accent`) ist Akzent, nicht Zweitfarbe** — erlaubt an genau **vier** Stellen: aktives
-  Zitat-Highlight, „Quelle bereit"-Badge, Studio-Akzentlinie und das **„N" im Markenzeichen** in
-  der dunklen Ausprägung (`--mark-ink`). Ohne diese Grenze wird aus einem Akzent innerhalb von
-  zwei Wochen eine zweite Primärfarbe.
+- **Gold (`--accent`) ist Akzent, nicht Zweitfarbe** — erlaubt an genau **vier** Stellen:
+  aktives Zitat-Highlight, „Quelle bereit"-Badge, Studio-Akzentlinie und das „N" im
+  Markenzeichen (`--mark-ink`, nur in der dunklen Ausprägung). Ohne diese Grenze wird aus einem
+  Akzent innerhalb von zwei Wochen eine zweite Primärfarbe. Die Aufzählung ist abschließend:
+  Wer eine fünfte braucht, ändert zuerst diese Zeile.
 
-  Die vierte kam später dazu und ist eine bewusste Erweiterung, keine Aufweichung: Ein
-  Markenzeichen ist der Ort, an dem ein Akzent hingehört. Die Aufzählung bleibt abschließend —
-  wer eine fünfte braucht, ändert zuerst diese Zeile.
+  Der Schein hinter dem Hero (`--glow`) ist in **beiden** Ausprägungen blau. Ein goldener war
+  im hellen Modus erprobt und wieder verworfen: Er war lesbar, verschob das Erscheinungsbild
+  aber von „dieselbe Marke bei Tag" zu „eine zweite Marke". Unterschiedlich ist nur der
+  Auslauf — auf Creme hebt sich dasselbe Blau weniger ab, ein kurzer Auslauf ergäbe dort eine
+  sichtbare Kante statt eines Scheins.
 
 - **Jeder Zustand hat eine Darstellung**: leer, ladend, fehlgeschlagen. Jeder Fehler nennt den
   Grund und bietet genau eine Handlung an. Nie „Etwas ist schiefgelaufen". Eine

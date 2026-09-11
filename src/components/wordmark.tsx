@@ -18,7 +18,9 @@ import { SITE_NAME } from '@/lib/site'
  * **Gold ist hier die vierte und letzte erlaubte Stelle** (siehe CLAUDE.md).
  * Ein Markenzeichen ist der Ort, an dem ein Akzent hingehört — aber die
  * Aufzählung dort ist abschließend, damit daraus keine zweite Primärfarbe
- * wird.
+ * wird. Der Schein hinter dem Hero war zwischenzeitlich golden und ist es
+ * bewusst nicht mehr: lesbar war er, aber er verschob das Erscheinungsbild
+ * von „dieselbe Marke bei Tag" zu „eine zweite Marke".
  *
  * Als Link, wenn `href` gesetzt ist: In der Kopfzeile führt das Zeichen zur
  * Startseite, im Arbeitsbereich wäre das ein Weg nach draußen, den niemand
@@ -67,7 +69,7 @@ export function Wordmark({
       */}
       <span
         className={cn(
-          'font-bold tracking-tight [word-spacing:normal]',
+          'text-mark-word font-bold tracking-tight [word-spacing:normal]',
           hideWordBelowSm && 'hidden sm:inline'
         )}
       >
@@ -77,7 +79,9 @@ export function Wordmark({
   )
 
   const klassen = cn(
-    'inline-flex items-center gap-1 rounded-control',
+    // 2px zwischen Plakette und Wort: eng genug, dass beides als ein Wort
+    // gelesen wird, weit genug, dass der Buchstabe nicht am „o" klebt.
+    'inline-flex items-center gap-0.5 rounded-control',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
     className
   )
