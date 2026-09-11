@@ -1,0 +1,72 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "pnpm exec next start --port 3210",
+      "startServerReadyPattern": "Ready in",
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage"
+      },
+      "url": ["http://localhost:3210/", "http://localhost:3210/anmelden"]
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": "lighthouse-report"
+    },
+    "assertMatrix": [
+      {
+        "matchingUrlPattern": ".*/$",
+        "assertions": {
+          "categories:performance": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ],
+          "categories:accessibility": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ],
+          "categories:best-practices": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ],
+          "categories:seo": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ]
+        }
+      },
+      {
+        "matchingUrlPattern": ".*/anmelden$",
+        "assertions": {
+          "categories:performance": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ],
+          "categories:accessibility": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ],
+          "categories:best-practices": [
+            "error",
+            {
+              "minScore": 0.9
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
@@ -6,6 +7,22 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth/actions'
 import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Alles unter /app trägt `noindex`.
+ *
+ * `robots.txt` bittet Crawler bereits, hier nicht zu suchen — aber eine Bitte
+ * greift nur, wenn sie gelesen wird, und sie gilt nicht für eine Adresse, die
+ * jemand direkt verlinkt hat. Dieser Kopf wirkt auch dann.
+ *
+ * Die eigentliche Grenze ist keines von beidem: Ein Crawler bekommt hier
+ * ohnehin nur die Weiterleitung zur Anmeldung zu sehen. Die Kette aus
+ * Middleware, Layout-Prüfung und RLS entscheidet über Zugriff; diese Zeile
+ * entscheidet nur darüber, ob die Anmeldeseite als Suchtreffer auftaucht.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+}
 
 /**
  * Rahmen des angemeldeten Bereichs.

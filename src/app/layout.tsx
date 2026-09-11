@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next'
+
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, siteUrl } from '@/lib/site'
 import { Lora, Plus_Jakarta_Sans } from 'next/font/google'
 
 import { ThemeProvider } from '@/components/theme-provider'
@@ -28,8 +30,39 @@ const lora = Lora({
 })
 
 export const metadata: Metadata = {
-  title: 'Notabene',
-  description: 'Lade Dokumente hoch und stelle Fragen. Jede Antwort ist belegt.'
+  /**
+   * Ohne `metadataBase` erzeugt Next relative Adressen für Open-Graph-Bilder
+   * und kanonische Links. Die funktionieren dort nicht: Sie werden von fremden
+   * Servern gelesen — Slack, LinkedIn, Suchmaschinen —, und ein `/og.png` ohne
+   * Host zeigt für die auf sich selbst.
+   */
+  metadataBase: new URL(siteUrl()),
+
+  /**
+   * Die Vorlage hängt den Produktnamen an jeden Seitentitel, ohne dass ihn
+   * jede Seite wiederholen muss. `default` gilt dort, wo eine Seite keinen
+   * eigenen Titel setzt.
+   */
+  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+
+  openGraph: {
+    type: 'website',
+    locale: 'de_DE',
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: '/'
+  },
+
+  // `summary_large_image`, weil das Bild 1200×630 ist. Mit `summary` würde es
+  // auf ein kleines Quadrat beschnitten, und die Schrift darin unlesbar.
+  twitter: { card: 'summary_large_image' },
+
+  // Der Standard für alles Öffentliche. Seiten unter /app setzen ihn
+  // ausdrücklich um — siehe src/app/app/layout.tsx.
+  robots: { index: true, follow: true }
 }
 
 export const viewport: Viewport = {
