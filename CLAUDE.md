@@ -73,7 +73,12 @@ ausgehenden Commit-Bereich und nicht nur den Arbeitsbaum.
 ## Befehle
 
 ```
-pnpm dev              Entwicklungsserver
+pnpm dev              Entwicklungsserver gegen die Werte aus .env.local
+pnpm dev:local        Entwicklungsserver gegen den lokalen Stack — zum Ausprobieren
+                      der richtige: `pnpm dev` zeigt auf das Produktionsprojekt,
+                      wo eine Registrierung eine echte E-Mail verschickt. Die
+                      AI-Anbieter bleiben auch hier echt; der Stub ist nur für
+                      die Tests.
 pnpm verify           format:check + lint + typecheck + test — das Tor vor jedem Commit
 pnpm test             Vitest (reine Funktionen)
 pnpm supabase:start   lokaler Postgres/Auth/Storage in Docker (Ports 5442x)

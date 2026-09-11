@@ -6,15 +6,19 @@
  * fremden Notebooks antwortete dann mit 200 statt 404. Die eine Abfrage hier
  * ist schnell genug, dass ein Skelett den korrekten Statuscode nicht aufwiegt.
  *
- * Der Platz für Quellen ist vorgesehen, aber noch leer; er kommt mit der
- * Ingestion-Scheibe.
+ * Die Seite lädt drei Dinge in einem Rutsch: das Notebook, seine Quellen und
+ * den Gesprächsverlauf. Der Verlauf geht als Ausgangszustand an den Chat —
+ * damit gibt es eine einzige Wahrheit für „welche Nachrichten existieren",
+ * statt eines zweiten Zustands für alte Nachrichten.
  */
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import { ChatPanel } from '@/components/chat/chat-panel'
 import { NotebookDelete } from '@/components/notebook-delete'
+import type { StoredMessage } from '@/lib/chat/ui'
 import { AddSource } from '@/components/sources/add-source'
 import { SourceList, type SourceItem } from '@/components/sources/source-list'
 import { NotebookForm } from '@/components/notebook-form'
@@ -104,6 +108,16 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
   // Dokumente seien weg.
   const sources: SourceItem[] = sourceRows ?? []
 
+  // Der Verlauf. Aufsteigend, weil ein Gespräch von oben nach unten gelesen
+  // wird — die Umkehrung wäre ein Sortierschritt im Client für nichts.
+  const { data: messageRows, error: messagesError } = await supabase
+    .from('messages')
+    .select('id, role, content, citations')
+    .eq('notebook_id', notebook.id)
+    .order('created_at', { ascending: true })
+
+  const history: StoredMessage[] = (messageRows ?? []) as StoredMessage[]
+
   // Die Action braucht die ID; `bind` reicht sie durch, ohne sie in ein
   // verstecktes Formularfeld zu schreiben, wo der Client sie ändern könnte.
   const update = updateNotebook.bind(null, notebook.id)
@@ -147,6 +161,24 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
           <SourceList sources={sources} />
         )}
         <AddSource notebookId={notebook.id} />
+      </section>
+
+      <section className="mt-8 flex flex-col gap-4">
+        <h2 className="text-base font-bold">Chat</h2>
+        {messagesError ? (
+          <p
+            role="alert"
+            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+          >
+            Der bisherige Verlauf konnte nicht geladen werden. Bitte die Seite neu laden.
+          </p>
+        ) : (
+          <ChatPanel
+            notebookId={notebook.id}
+            sources={sources.map((s) => ({ id: s.id, title: s.title, status: s.status }))}
+            history={history}
+          />
+        )}
       </section>
 
       <section className="mt-4 rounded-card border border-hairline bg-surface p-6">
