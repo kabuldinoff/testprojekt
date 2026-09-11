@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Wordmark } from '@/components/wordmark'
 
 /**
  * Rahmen für Anmeldung und Registrierung: zentrierte Karte auf dem
@@ -19,11 +19,18 @@ export function AuthShell({
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-6 py-12 [background-image:var(--glow)] [background-repeat:no-repeat]">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="font-bold tracking-tight">
-            Notabene
-          </Link>
-          <ThemeToggle />
+        {/*
+          Das Zeichen steht mittig über der Karte, der Umschalter rechts.
+          Beide in derselben Zeile mit `justify-between` zu setzen hieße: Das
+          Zeichen rutscht nach links und sitzt nicht mehr über der Mitte der
+          Karte darunter. Deshalb liegt der Umschalter absolut, und das Zeichen
+          zentriert sich im vollen Platz.
+        */}
+        <div className="relative mb-8 flex h-9 items-center justify-center">
+          <Wordmark href="/" />
+          <div className="absolute right-0">
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="rounded-card border border-hairline bg-surface p-6 shadow-sm">

@@ -101,3 +101,64 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  lighthouse:
+    name: Lighthouse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Wie in den anderen Jobs: Sonst bleibt das Token in .git/config des
+          # Runners liegen und ist für jeden späteren Schritt lesbar — und
+          # dieser Job führt danach Code aus den Abhängigkeiten aus.
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Derselbe Browser wie in der e2e-Suite, aus demselben Zwischenspeicher.
+      # Gemessen wird damit, womit auch getestet wird — und es spart einen
+      # zweiten Chrome-Download.
+      - name: Playwright-Version ermitteln
+        id: pw
+        run: echo "version=$(node -p "require('./package.json').devDependencies['@playwright/test'].replace(/[^0-9.]/g,'')")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      # Die Systembibliotheken liegen nicht im Zwischenspeicher, nur der
+      # Browser. Bei einem Treffer wäre er also da und ließe sich trotzdem
+      # nicht starten. Derselbe Schritt steht aus demselben Grund im e2e-Job.
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Auch die Messung braucht einen laufenden Stack: `next start` rendert
+      # die Seiten serverseitig, und ohne Umgebungsvariablen wirft `publicEnv()`
+      # beim Rendern. Lighthouse meldete dann einen Wert von 0, und niemand
+      # wüsste, dass die Ursache eine fehlende Variable war.
+      - name: Supabase-Stack starten
+        run: >-
+          pnpm exec supabase start
+          -x studio,realtime,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
+
+      # Die Schwelle liegt bei 90 und steht in lighthouserc.json. Gemessen wird
+      # dreimal je Adresse, weil ein einzelner Lauf auf einem geteilten Runner
+      # um mehrere Punkte schwanken kann.
+      - run: pnpm lighthouse
+
+      - name: Supabase-Stack stoppen
+        if: always()
+        run: pnpm exec supabase stop
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: lighthouse-report
+          path: lighthouse-report/
+          retention-days: 7

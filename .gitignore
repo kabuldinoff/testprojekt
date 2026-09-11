@@ -42,3 +42,5 @@ supabase/.temp/
 .vercel/
 .DS_Store
 *.log
+lighthouse-report/
+.lighthouseci/

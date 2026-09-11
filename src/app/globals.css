@@ -23,6 +23,38 @@
    gewinnt die spätere Regel. Stünde der :root-Block hinten, überstimmte er
    jedes .light — der Umschalter täte sichtbar nichts, ohne Fehlermeldung und
    ohne dass irgendein Test rot wird. Genau das ist im Canvas schon passiert. */
+/* ── Maße, die in beiden Ausprägungen gleich sind ─────────────────────────
+   Eigener Block, weil sie **keine** Farben sind: Der Theme-Vertrag
+   (src/lib/__tests__/theme-tokens.test.ts) verlangt, dass `.light` jedes
+   Token aus dem Dark-Block überschreibt. Für Geometrie hieße das, denselben
+   Wert zweimal zu schreiben und damit zu behaupten, er könnte sich
+   unterscheiden. */
+:root {
+  /* Die Ecke der Marken-Plakette: 7 auf 28 Pixel, also ein Viertel. Deutlich
+     abgerundet, ohne ein Kreis zu werden — bei einem einzelnen Buchstaben
+     liest sich ein Kreis als Aufzählung und ein scharfes Quadrat als Fehler.
+     src/lib/brand.ts hält denselben Wert für das Tab-Symbol; ein Test
+     vergleicht beide. */
+  --mark-radius: 7px;
+
+  /* Die Größe, bei der das „N" die Plakette füllt, ohne an den Rand zu
+     stoßen. Fett gesetzt liegt sie damit unter der Schwelle für „großen
+     Text" (18.66px) — der Kontrast wird deshalb gegen die strenge Schwelle
+     geprüft, nicht gegen die lockere. */
+  --mark-text-size: 15px;
+
+  /* Die Wortgröße daneben. Größer als der Buchstabe in der Plakette, weil
+     die Plakette ihn einfasst und dadurch optisch vergrößert — gleiche Zahlen
+     ließen das Wort kleiner wirken als das Zeichen. */
+  --mark-word-size: 18px;
+
+  /* Höhe des Verlaufs hinter dem Hero. Der hellste Punkt der Ellipse liegt
+     über dem oberen Rand; nach 560px ist sie vollständig ausgelaufen. Kürzer
+     entsteht eine sichtbare Kante, länger färbt der Verlauf die Karten
+     darunter ein. */
+  --glow-height: 560px;
+}
+
 :root,
 .dark {
   --brand-50: #22304f; /* muss heller als --surface sein, sonst verschwinden
@@ -64,6 +96,25 @@
   --cite-border: #38508a;
 
   --glow: radial-gradient(700px 380px at 50% -6%, rgb(37 99 235 / 0.45), transparent 60%);
+
+  /* Zwei Schattenstufen aus dem Canvas. Im Dunkeln kräftiger als im Hellen:
+     Auf dunklem Grund trägt ein Schatten weniger, weil weniger Kontrast
+     zwischen Fläche und Schatten bleibt — derselbe Wert wirkt dort wie gar
+     keiner. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-pop: 0 8px 16px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.45);
+
+  /* Das Markenzeichen: das „N" als Plakette, wie das Symbol im Browser-Tab.
+     Die Fläche ist in beiden Ausprägungen dieselbe dunkle Farbe — so sieht
+     das Zeichen überall gleich aus, egal auf welchem Grund es sitzt. Nur der
+     Buchstabe wechselt: im Dunkeln Gold, im Hellen das Blau aus dem
+     Tab-Symbol. Siehe CLAUDE.md, Gold-Disziplin. */
+  --mark-bg: #0e1424;
+  /* Derselbe Wert wie --accent, ausgeschrieben statt als var(): Der
+     Kontrast-Test liest die Tokens als Text aus dieser Datei und kann eine
+     Verschachtelung nicht auflösen. Ein Verweis, den die Prüfung nicht
+     nachvollziehen kann, wäre eine ungeprüfte Farbe. */
+  --mark-ink: #faef70; /* = --accent · 15.42:1 auf --mark-bg */
 }
 
 /* ── LIGHT — überschreibt den Default ────────────────────────────────────── */
@@ -98,7 +149,31 @@
   --cite-fg: #1d4ed8;
   --cite-border: #c7d9ff;
 
-  --glow: radial-gradient(60% 70% at 50% 30%, rgb(37 99 235 / 0.08), transparent 70%);
+  /* Dieselbe Geometrie wie im Dunkeln, dieselbe Farbe, dieselbe Deckkraft —
+     nur der Auslauf ist weiter: `transparent 90%` statt 60%.
+
+     Das ist der ganze Unterschied, und er hat einen Grund. Auf dem dunklen
+     Grund hebt sich das Blau stark ab; ein kurzer Auslauf wirkt dort als
+     Lichtkegel. Auf Creme ist der Abstand geringer, und derselbe kurze
+     Auslauf ergäbe eine sichtbare Kante — einen blauen Streifen statt eines
+     Scheins. Der weitere Auslauf verteilt dieselbe Farbe über mehr Fläche
+     und lässt sie auslaufen, bevor das Auge eine Grenze findet.
+
+     Nachgerechnet, weil Text darüber liegt: An der dichtesten Stelle ergibt
+     sich #99B3ED, darauf --ink 8.76:1 — über der AA-Schwelle. Der Absatz
+     darunter steht bei rund 335px, wo der Verlauf bereits ausgelaufen ist;
+     dort gilt --muted-ink auf --canvas, und das ist separat geprüft.
+     src/lib/__tests__/contrast.test.ts hält die Überschrift fest. */
+  --glow: radial-gradient(700px 380px at 50% -6%, rgb(37 99 235 / 0.45), transparent 90%);
+
+  --shadow-card: 0 1px 2px rgb(14 20 36 / 0.04), 0 8px 24px rgb(14 20 36 / 0.06);
+  --shadow-pop: 0 8px 16px rgb(14 20 36 / 0.08), 0 24px 48px rgb(14 20 36 / 0.1);
+
+  /* Fläche bleibt dunkel; der Buchstabe ist hier das Blau aus dem Tab-Symbol
+     (#5B8DEF), nicht das hellere brand-600 dieser Ausprägung — auf dunklem
+     Grund braucht es den helleren Ton. */
+  --mark-bg: #0e1424;
+  --mark-ink: #5b8def;
 }
 
 @theme inline {
@@ -132,6 +207,15 @@
   --color-cite-fg: var(--cite-fg);
   --color-cite-border: var(--cite-border);
 
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --color-mark-bg: var(--mark-bg);
+  --color-mark-ink: var(--mark-ink);
+  --radius-mark: var(--mark-radius);
+  --text-mark: var(--mark-text-size);
+  --text-mark-word: var(--mark-word-size);
+
   /* Radien von der Referenzseite: Karte 16, Control 12, Pill rund. */
   --radius-card: 16px;
   --radius-control: 12px;
@@ -158,6 +242,17 @@
     color: var(--ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+
+    /* Etwas mehr Luft zwischen den Wörtern.
+       
+       Plus Jakarta Sans setzt das Leerzeichen eng, und bei zwei kurzen Wörtern
+       hintereinander liest man sie beim Überfliegen als eines. Das fällt vor
+       allem im Deutschen auf, wo zusammengesetzte Wörter ohnehin lang sind und
+       das Auge nach Wortgrenzen sucht.
+       
+       Als Anteil der Schriftgröße, nicht in Pixeln: Der Abstand soll in einer
+       Überschrift mitwachsen, sonst wirkt er dort verschwindend. */
+    word-spacing: 0.08em;
   }
 
   /* Ein sichtbarer Fokusring ist keine Kür. Ohne ihn ist die App per Tastatur

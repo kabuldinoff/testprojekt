@@ -1,11 +1,34 @@
-import Link from 'next/link'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Wordmark } from '@/components/wordmark'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth/actions'
 import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Alles unter /app trägt `noindex`.
+ *
+ * `robots.txt` bittet Crawler bereits, hier nicht zu suchen — aber eine Bitte
+ * greift nur, wenn sie gelesen wird, und sie gilt nicht für eine Adresse, die
+ * jemand direkt verlinkt hat. Dieser Kopf wirkt auch dann.
+ *
+ * Die eigentliche Grenze ist keines von beidem: Ein Crawler bekommt hier
+ * ohnehin nur die Weiterleitung zur Anmeldung zu sehen. Die Kette aus
+ * Middleware, Layout-Prüfung und RLS entscheidet über Zugriff; diese Zeile
+ * entscheidet nur darüber, ob die Anmeldeseite als Suchtreffer auftaucht.
+ *
+ * **Die einzige Stelle.** Zuvor stand dasselbe zusätzlich an drei Seiten. Das
+ * war nicht nur Wiederholung: Es machte diese Zeile wirkungslos und damit
+ * unprüfbar — ein Test konnte nicht zeigen, dass sie etwas tut, weil die
+ * Seiten es ohnehin selbst erklärten. Jetzt trägt das Layout es für den
+ * ganzen Bereich, auch für jede Seite, die später dazukommt.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+}
 
 /**
  * Rahmen des angemeldeten Bereichs.
@@ -30,9 +53,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-canvas">
       <header className="flex items-center gap-4 border-b border-hairline bg-surface px-5 py-3">
-        <Link href="/app" className="font-bold tracking-tight">
-          Notabene
-        </Link>
+        <Wordmark href="/app" />
         <span className="flex-1" />
         <span className="hidden text-sm text-muted-ink sm:inline">{user.email}</span>
         <ThemeToggle />

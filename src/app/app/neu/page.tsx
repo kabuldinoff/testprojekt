@@ -12,8 +12,7 @@ import { NotebookForm } from '@/components/notebook-form'
 import { createNotebook } from '@/lib/notebooks/actions'
 
 export const metadata: Metadata = {
-  title: 'Neues Notebook · Notabene',
-  robots: { index: false, follow: false }
+  title: 'Neues Notebook · Notabene'
 }
 
 /**

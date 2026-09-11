@@ -20,8 +20,12 @@ Prüfpunkt zugeordnet werden kann.
 
 | b5 | `e2e/b5-audio-overview.spec.ts` | Aus den Quellen entsteht ein zweistimmiger Überblick, ausgeliefert über eine signierte Adresse, mit Transkript; ein erschöpftes Kontingent hinterlässt **`script_only`** statt eines endlosen Ladebalkens; mit Mistral ist der Überblick gesperrt und nennt den Grund; ohne verarbeitete Quelle wird nichts angeboten; ein fremdes Notebook ergibt **404** |
 
-Geplant, in der Reihenfolge der Umsetzung: `c1-responsive`, `c2-a11y`, `d1-landing-seo`,
-`d2-design-tokens`.
+| d1 | `e2e/d1-landing-seo.spec.ts` | Startseite mit Überschrift, Einstiegen und gültigem JSON-LD; der Datenfluss-Text stammt aus derselben Quelle wie in der App; `robots.txt` sperrt den Arbeitsbereich; die Sitemap nennt **nur** Indexierbares; `llms.txt` beschreibt und weist nicht an; `/app` trägt `noindex`; das Vorschaubild wird ausgeliefert |
+
+Geplant, in der Reihenfolge der Umsetzung: `c1-responsive`, `c2-a11y`, `d2-design-tokens`.
+
+Dazu `pnpm lighthouse`: baut die Produktionsfassung, misst dreimal je Adresse und bricht unter 90
+ab. Gemessene Werte und die eine bewusste Ausnahme stehen in `docs/lighthouse.md`.
 
 > `b3` läuft gegen einen Stub statt gegen Google und Mistral (`docs/adr/0006`). Der Weg zu den
 > echten Anbietern ist deshalb nur von Hand abgedeckt — siehe die Punkte 6 bis 12 unten.
