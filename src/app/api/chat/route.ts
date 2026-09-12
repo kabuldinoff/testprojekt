@@ -32,6 +32,8 @@ import { chatModel } from '@/lib/llm/chat'
 import { providerOrDefault } from '@/lib/llm/registry'
 import { logLlmCall } from '@/lib/llm/usage'
 import { createClient } from '@/lib/supabase/server'
+import { ZU_VIELE } from '@/lib/rate-limit/limits'
+import { verbrauche } from '@/lib/rate-limit/guard'
 
 /**
  * Eine Antwort mit Suche und Modellaufruf braucht länger als die
@@ -67,6 +69,20 @@ export async function POST(request: Request): Promise<Response> {
     data: { user }
   } = await supabase.auth.getUser()
   if (!user) return Response.json({ message: 'Nicht angemeldet.' }, { status: 401 })
+
+  // Gedrosselt wird **nach** der Anmeldeprüfung und **vor** allem anderen.
+  //
+  // Nach der Anmeldung, weil der Zähler am Nutzer hängt und ein Unangemeldeter
+  // keinen hat. Vor allem anderen, weil jede Zeile davor Arbeit ist, die im
+  // gedrosselten Fall umsonst war — und weil der Anbieter-Aufruf genau das
+  // ist, was hier nicht passieren soll.
+  //
+  // Eine Frage kostet zwei Anbieter-Aufrufe: einen für die Suche, einen für
+  // die Antwort.
+  const drossel = await verbrauche(supabase, 'chat')
+  if (!drossel.erlaubt) {
+    return Response.json({ message: drossel.message }, { status: ZU_VIELE })
+  }
 
   const eingabe = AnfrageSchema.safeParse(await request.json().catch(() => null))
   if (!eingabe.success) {

@@ -197,6 +197,53 @@ test('Alice kann ihre eigene Notiz ändern und löschen — die Gegenprobe', asy
   expect((await nachher.json()) as unknown[]).toEqual([])
 })
 
+test('an die Drossel-Zähler kommt niemand heran — auch nicht an die eigenen', async ({
+  request
+}) => {
+  // Ein Zähler, den der Gezählte ändern darf, ist keiner.
+  //
+  // `rate_limits` hat RLS an und **keine einzige Policy**, und es gibt kein
+  // `grant` für `authenticated`. Das ist Absicht und keine vergessene Zeile:
+  // Der einzige Weg an die Tabelle führt über `consume_rate_limit`, und die
+  // kann nur hochzählen. Ohne diesen Test sähe die fehlende Policy aus wie ein
+  // Versehen, das jemand „behebt".
+  const api = asUser(request, alice)
+
+  for (const [name, aufruf] of [
+    ['lesen', () => api.get('rate_limits?select=count')],
+    ['anlegen', () => api.post('rate_limits', { user_id: alice.userId, bucket: 'chat', count: 0 })],
+    ['ändern', () => api.patch('rate_limits?bucket=eq.chat', { count: 0 })],
+    ['löschen', () => api.delete('rate_limits?bucket=eq.chat')]
+  ] as const) {
+    const antwort = await aufruf()
+    expect(antwort.ok(), `${name} war erlaubt: ${await antwort.text()}`).toBe(false)
+  }
+})
+
+test('die Drossel-Funktion verbraucht nur das eigene Kontingent', async ({ request }) => {
+  // Sie nimmt **keine** Nutzer-ID entgegen, sondern liest sie aus dem Token.
+  // Damit gibt es kein Argument, über das jemand fremdes Kontingent leeren
+  // könnte — der häufigste Fehler bei genau diesem Muster.
+  //
+  // Geprüft wird das Verhalten und nicht die Signatur: Mallory leert ihren
+  // Topf, und Alices bleibt unberührt.
+  const topf = `probe-${Date.now()}`
+  const verbrauchen = (wer: TestUser) =>
+    asUser(request, wer).post('rpc/consume_rate_limit', {
+      p_bucket: topf,
+      p_limit: 1,
+      p_window: '1 hour'
+    })
+
+  expect(await (await verbrauchen(mallory)).json()).toBe(true)
+  expect(await (await verbrauchen(mallory)).json(), 'Mallorys Grenze greift').toBe(false)
+
+  expect(
+    await (await verbrauchen(alice)).json(),
+    'Mallorys Verbrauch hat Alices Topf geleert'
+  ).toBe(true)
+})
+
 test('Mallory sieht Alices Profil nicht', async ({ request }) => {
   const response = await asUser(request, mallory).get(`profiles?id=eq.${alice.userId}`)
   expect(response.status()).toBe(200)

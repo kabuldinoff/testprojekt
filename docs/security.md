@@ -50,6 +50,44 @@ das Speicherkontingent.
 Eine Policy, die die Datei bloß verbirgt, sähe sonst genauso aus wie eine gelöschte, und der
 Test wäre grün, während der Speicher vollläuft.
 
+## Drosselung — was sie schützt und was nicht
+
+Sie schützt **kein Geheimnis**, sondern ein Kontingent. Die AI-Anbieter laufen im kostenlosen
+Tarif; was hier verbraucht wird, ist eine Tagesmenge, und ist sie leer, steht das Produkt still,
+ohne dass irgendetwas kaputt ist. Ein Neulade-Reflex, eine offene Schleife im Browser oder ein
+neugieriger Gast reichen dafür — das Repository ist öffentlich und die Registrierung offen, und
+beides ist so gewollt.
+
+Gezählt wird in Postgres (`consume_rate_limit`, Migration 0013) und nicht im Speicher der
+Function: Auf Vercel kann jede Anfrage eine andere Instanz treffen, ein Zähler in einer
+Modulvariablen begrenzt also nichts.
+
+| Topf     | Grenze | Fenster        |
+| -------- | ------ | -------------- |
+| `chat`   | 40     | 1 Stunde       |
+| `ingest` | 30     | 1 Stunde       |
+| `audio`  | 6      | **24 Stunden** |
+
+Audio zählt als einziges über den Tag, weil das Tageskontingent der Sprachausgabe genau so
+bemessen ist: Ist es erschöpft, ist es bis Mitternacht weg, und eine Stundengrenze schützte
+davor nicht.
+
+**Die Tabelle ist für Angemeldete unerreichbar** — keine Policy, kein `grant`, alle vier
+Operationen ergeben 403. Der einzige Weg führt über die Funktion, und die kann nur hochzählen.
+Sie nimmt keine Nutzer-ID entgegen, sondern liest sie aus dem Token; damit gibt es kein
+Argument, über das jemand fremdes Kontingent leeren könnte. `e2e/a2-rls-isolation` hält beides
+fest.
+
+**Was sie bewusst nicht kann:** Sie zählt pro Konto, nicht pro IP. Wer beliebig viele Konten
+anlegt, umgeht sie — dagegen hilft nur die E-Mail-Bestätigung, und die ist an das Kontingent von
+zwei Nachrichten pro Stunde gebunden. Für eine Bewerbungsdemo ist das die richtige Abwägung; für
+ein Produkt wäre es keine.
+
+**Und was sie im Fehlerfall tut:** durchlassen, nicht sperren. Ist der Zähler nicht erreichbar,
+kostet Durchlassen im schlimmsten Fall Kontingent — Sperren kostet das Produkt. Eine
+Schutzmaßnahme darf nicht zur Ursache des Ausfalls werden, den sie verhindern soll. Der Fall
+wird protokolliert, damit er nicht still bleibt.
+
 ## Der Schlüssel, der alles darf
 
 `SUPABASE_SECRET_KEY` umgeht RLS vollständig. Er lebt an genau einer Stelle

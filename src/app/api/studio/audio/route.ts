@@ -12,6 +12,8 @@ import { z } from 'zod'
 import { PROVIDERS, providerOrDefault } from '@/lib/llm/registry'
 import { generateOverview } from '@/lib/studio/overview'
 import { createClient } from '@/lib/supabase/server'
+import { ZU_VIELE } from '@/lib/rate-limit/limits'
+import { verbrauche } from '@/lib/rate-limit/guard'
 
 /**
  * Skript und Vertonung zusammen dauern bei drei Minuten Audio rund
@@ -31,6 +33,20 @@ export async function POST(request: Request): Promise<Response> {
     data: { user }
   } = await supabase.auth.getUser()
   if (!user) return Response.json({ message: 'Nicht angemeldet.' }, { status: 401 })
+
+  // Gedrosselt wird **nach** der Anmeldeprüfung und **vor** allem anderen.
+  //
+  // Nach der Anmeldung, weil der Zähler am Nutzer hängt und ein Unangemeldeter
+  // keinen hat. Vor allem anderen, weil jede Zeile davor Arbeit ist, die im
+  // gedrosselten Fall umsonst war — und weil der Anbieter-Aufruf genau das
+  // ist, was hier nicht passieren soll.
+  //
+  // Der knappste Topf. Das Tageskontingent der Sprachausgabe zeigt sich erst
+  // als 429 und ist dann für den Rest des Tages weg.
+  const drossel = await verbrauche(supabase, 'audio')
+  if (!drossel.erlaubt) {
+    return Response.json({ message: drossel.message }, { status: ZU_VIELE })
+  }
 
   const eingabe = AnfrageSchema.safeParse(await request.json().catch(() => null))
   if (!eingabe.success) {

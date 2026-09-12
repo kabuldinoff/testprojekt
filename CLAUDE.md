@@ -208,6 +208,17 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
 - **Datenbankfunktionen, die PostgREST exponiert, sind `SECURITY INVOKER`.** Mit
   `SECURITY DEFINER` liefen sie als `postgres`, umgingen RLS und wären ein Datenleck mit
   Aufruf-Interface.
+
+  **Eine Ausnahme, und sie ist begründet:** `consume_rate_limit` (Migration 0013) ist
+  `SECURITY DEFINER`, weil sie eine Tabelle schreiben **muss**, die der Aufrufer nicht schreiben
+  darf — ein Zähler, den der Gezählte ändern kann, ist keiner. Der Grund hinter der Regel greift
+  hier nicht: Die Funktion gibt nichts heraus als einen Wahrheitswert über den eigenen Topf.
+  Drei Dinge machen sie sicher, und alle drei sind geprüft: Sie nimmt **keine Nutzer-ID
+  entgegen**, sondern liest sie aus dem Token; sie kann nur hochzählen; und `rate_limits` hat
+  weder Policy noch `grant` für `authenticated` (`e2e/a2-rls-isolation`).
+
+  Wer eine zweite Ausnahme braucht, schreibt sie hier auf oder hat keine.
+
 - **Fehlender Zugriff ergibt 404, nie 403.** Ein 403 bestätigt, dass die Ressource existiert.
 
   Damit das auch als HTTP-Status ankommt, darf **keine `loading.tsx` über einer Route liegen,
