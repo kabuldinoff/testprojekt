@@ -175,6 +175,12 @@ test('eine fremde Quelle lässt sich weder anlegen noch anstoßen', async ({
   const angestossen = await mallory.request.post(`/api/sources/${alicesSourceId}/ingest`)
   expect(angestossen.status()).toBe(404)
 
+  // Und ihr Text ist über die Betrachter-Route ebenso wenig zu holen. Diese
+  // Route liefert den **vollständigen** Inhalt einer Quelle — von allen
+  // Endpunkten der, bei dem eine fehlende Prüfung am teuersten wäre.
+  const gelesen = await mallory.request.get(`/api/sources/${alicesSourceId}/text`)
+  expect(gelesen.status()).toBe(404)
+
   await context.close()
 
   // Und Alices Abschnitte sind auch direkt über PostgREST nicht zu holen.

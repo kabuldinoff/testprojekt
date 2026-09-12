@@ -25,7 +25,7 @@ import { cn } from '@/lib/cn'
  */
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
-type Size = 'default' | 'compact'
+type Size = 'default' | 'compact' | 'icon'
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-600 text-on-brand hover:bg-brand-700 border-transparent',
@@ -36,7 +36,14 @@ const VARIANTS: Record<Variant, string> = {
 
 const SIZES: Record<Size, string> = {
   default: 'px-4 py-2.5 text-sm',
-  compact: 'px-3 py-1.5 text-sm'
+  compact: 'px-3 py-1.5 text-sm',
+  // Nur ein Symbol darin, also ringsum gleich viel Luft: 2.5 auf ein 20px-Icon
+  // ergibt 40px im Quadrat — dieselbe Höhe wie `default`, damit ein Symbolknopf
+  // neben einem beschrifteten auf derselben Linie sitzt.
+  //
+  // Ein Symbolknopf trägt seinen zugänglichen Namen zwangsläufig im
+  // `aria-label`: Es gibt keinen Text, aus dem er entstehen könnte.
+  icon: 'p-2.5'
 }
 
 /**

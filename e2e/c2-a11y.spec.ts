@@ -126,6 +126,26 @@ test('der Arbeitsbereich ist zugänglich, mit Quelle, Antwort und Notiz', async 
     await themaSetzen(page, thema)
     await pruefen(page, `Arbeitsbereich voll (${thema})`)
   }
+
+  // Und der Quellenbetrachter darüber. Er ist ein eigener Zustand und kein
+  // Teil der Seite darunter: ein modales `<dialog>` legt den Rest still, und
+  // axe sieht anschließend im Wesentlichen nur noch ihn. Ohne diesen Durchlauf
+  // bliebe ausgerechnet die Markierung ungeprüft — Gold mit dunkler Tinte ist
+  // das Paar, das am ehesten kippt.
+  //
+  // Das Thema wird **vor** dem Öffnen gesetzt und der Dialog danach wieder
+  // geschlossen. Andersherum lief der Test in eine Zeitüberschreitung: Der
+  // Umschalter liegt hinter dem Dialog und nimmt keine Klicks mehr an. Das ist
+  // kein Hindernis, sondern der Beweis, dass `showModal()` wirkt — mit dem
+  // `open`-Attribut wäre der Knopf erreichbar geblieben.
+  for (const thema of THEMES) {
+    await themaSetzen(page, thema)
+    await page.getByRole('button', { name: 'Im Dokument anzeigen' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await pruefen(page, `Quellenbetrachter (${thema})`)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+  }
 })
 
 test('der Sprunglink führt mit einem Tastendruck zum Chat', async ({ page }) => {

@@ -4,7 +4,9 @@
 
 Ein Rechercheassistent: Nutzer legen Notebooks an, laden Quellen hoch (PDF, Text, Markdown,
 URL, eingefügter Text) und stellen Fragen dazu. Jede Antwort ist mit klickbaren Inline-Zitaten
-belegt, ein Klick öffnet die Quelle an der exakten Textstelle. Dazu ein Studio, das aus den
+belegt: Ein Klick zeigt die belegte Passage im Wortlaut, von dort führt ein zweiter in den
+vollständigen Quelltext, an der markierten Stelle. Quellen lassen sich wieder entfernen; bereits
+gegebene Antworten behalten ihre Belege, weil die Passage in der Nachricht liegt. Dazu ein Studio, das aus den
 ausgewählten Quellen einen zweistimmigen Audio-Überblick erzeugt.
 
 Stack: **Next.js 16 (App Router) · TypeScript · Supabase (Postgres + pgvector, Auth, Storage) ·
@@ -130,7 +132,16 @@ pnpm format           Prettier schreiben
   entworfen und gemessen, nicht gegen Weiß.
 - **Gold (`--accent`) ist Akzent, nicht Zweitfarbe** — erlaubt an genau **vier** Stellen:
   aktives Zitat-Highlight, „Quelle bereit"-Badge, Studio-Akzentlinie und das „N" im
-  Markenzeichen (`--mark-ink`, nur in der dunklen Ausprägung). Ohne diese Grenze wird aus einem
+  Markenzeichen (`--mark-ink`, nur in der dunklen Ausprägung).
+
+  Das aktive Zitat-Highlight meint **beide Enden desselben Vorgangs**: den angeklickten Chip und
+  die markierte Passage im Quellenbetrachter. Dass sie dieselbe Farbe tragen, ist der Punkt —
+  eine eigene Markierungsfarbe wäre eine fünfte Stelle und zugleich eine schlechtere Auskunft.
+
+  Die Schrift auf der vollen Goldfläche ist `--on-accent`, **nicht** `--accent-ink`: Letzteres ist
+  die Schrift auf `--accent-soft` und im Dunkeln derselbe Goldton wie die Fläche. Die Verwechslung
+  hat den aktiven Chip einmal vollständig unsichtbar gemacht; `contrast.test.ts` prüft das Paar
+  seitdem. Ohne diese Grenze wird aus einem
   Akzent innerhalb von zwei Wochen eine zweite Primärfarbe. Die Aufzählung ist abschließend:
   Wer eine fünfte braucht, ändert zuerst diese Zeile.
 

@@ -2,6 +2,8 @@
 
 import { useRef, useState, type ReactNode } from 'react'
 
+import { Chevron } from '@/components/ui/icons'
+
 /**
  * Der Arbeitsbereich in drei Ausprägungen — mit **einem** Markup.
  *
@@ -9,7 +11,8 @@ import { useRef, useState, type ReactNode } from 'react'
  *
  *   ≥ 1280px  Drei Spalten nebeneinander: Quellen · Chat · Studio. Die
  *             Umschaltleiste ist ausgeblendet, weil es nichts umzuschalten
- *             gibt.
+ *             gibt — dafür lässt sich jede Seitenspalte einklappen und der
+ *             Chat nimmt den Platz.
  *   768–1279  Der Chat bleibt immer stehen, daneben höchstens **ein**
  *             Seitenpanel. Die Leiste wählt, welches.
  *   < 768px   Ein Bereich zur Zeit. Voreinstellung ist der Chat — wer die
@@ -30,6 +33,12 @@ import { useRef, useState, type ReactNode } from 'react'
  * der Fensterbreite abhängen, muss man im laufenden Betrieb umschreiben.
  * Stattdessen: gewöhnliche Umschaltknöpfe mit `aria-pressed`, die oberhalb
  * von 1280px gar nicht erst dargestellt werden.
+ *
+ * **Zwei Zustände, aber nie gleichzeitig wirksam.** `data-aktiv` entscheidet
+ * unterhalb von 1280px, `data-offen` ausschließlich darüber; jedes gilt nur
+ * in seiner Media Query. Beide gleichzeitig anzuwenden hieße, einen Bereich
+ * verstecken zu können, den die Umschaltleiste daneben als aktiv anzeigt.
+ * Deshalb behält jede Breite genau ein Kriterium.
  */
 
 export type Bereich = 'quellen' | 'chat' | 'studio'
@@ -55,6 +64,16 @@ export function Workspace({
   studio: ReactNode
 }) {
   const [aktiv, setAktiv] = useState<Bereich>('chat')
+
+  // Welche Seitenspalte auf Desktop ausgeklappt ist. Bewusst nicht gespeichert:
+  // Es ist eine Einstellung für einen Moment — „jetzt gerade brauche ich mehr
+  // Platz für die Antwort" —, keine Vorliebe. Eine über Tage nachwirkende
+  // leere Spalte wäre die unangenehmere Überraschung.
+  const [offen, setOffen] = useState<Record<'quellen' | 'studio', boolean>>({
+    quellen: true,
+    studio: true
+  })
+
   const chatRef = useRef<HTMLElement>(null)
 
   /**
@@ -125,12 +144,34 @@ export function Workspace({
             </button>
           ))}
         </div>
+
+        {/*
+          Nur auf Desktop sichtbar (`.workspace-klapper` in globals.css).
+          `aria-pressed` beschreibt den Knopf, nicht die Spalte: gedrückt heißt
+          eingeklappt. Der Pfeil zeigt dabei in die Richtung, in die sich die
+          Spalte bewegt — bei der linken also nach links, wenn sie weichen soll.
+        */}
+        <div className="workspace-klapper" role="group" aria-label="Spalten einklappen">
+          <Klapper
+            seite="links"
+            offen={offen.quellen}
+            label="Quellenspalte"
+            onToggle={() => setOffen((v) => ({ ...v, quellen: !v.quellen }))}
+          />
+          <Klapper
+            seite="rechts"
+            offen={offen.studio}
+            label="Studiospalte"
+            onToggle={() => setOffen((v) => ({ ...v, studio: !v.studio }))}
+          />
+        </div>
       </div>
 
       <div className="workspace-spalten">
         <section
           data-bereich="quellen"
           data-aktiv={aktiv === 'quellen'}
+          data-offen={offen.quellen}
           aria-labelledby="abschnitt-quellen"
           className="workspace-seite"
         >
@@ -159,6 +200,7 @@ export function Workspace({
         <section
           data-bereich="studio"
           data-aktiv={aktiv === 'studio'}
+          data-offen={offen.studio}
           aria-label="Studio"
           className="workspace-seite workspace-seite--rechts"
         >
@@ -166,5 +208,40 @@ export function Workspace({
         </section>
       </div>
     </div>
+  )
+}
+
+/**
+ * Ein Klappknopf für eine Seitenspalte.
+ *
+ * Der zugängliche Name sagt, was passiert, nicht was ist — „Quellenspalte
+ * einklappen" statt „Quellenspalte". Ein Symbolknopf ohne Text hat sonst
+ * keinen Namen, und „Chevron" wäre keiner.
+ */
+function Klapper({
+  seite,
+  offen,
+  label,
+  onToggle
+}: {
+  seite: 'links' | 'rechts'
+  offen: boolean
+  label: string
+  onToggle: () => void
+}) {
+  // Ausgeklappt weist der Pfeil nach außen (die Spalte weicht dorthin),
+  // eingeklappt nach innen (sie käme von dort zurück).
+  const richtung = offen === (seite === 'links') ? 'links' : 'rechts'
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!offen}
+      aria-label={`${label} ${offen ? 'einklappen' : 'ausklappen'}`}
+      className="rounded-control p-1.5 text-muted-ink transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+    >
+      <Chevron richtung={richtung} />
+    </button>
   )
 }

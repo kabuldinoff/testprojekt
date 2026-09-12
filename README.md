@@ -2,8 +2,9 @@
 
 A research assistant for your own documents. Create a notebook, add sources — PDF, text,
 Markdown, a URL, or pasted text — and ask questions about them. Every answer carries clickable
-inline citations, and a click opens the source at the exact passage it came from. The studio
-turns the selected sources into a two-voice audio overview.
+inline citations: a click reveals the passage it rests on, and from there the full source text
+opens with that passage highlighted. The studio turns the selected sources into a two-voice
+audio overview.
 
 Built with **Next.js 16, TypeScript and Supabase**.
 

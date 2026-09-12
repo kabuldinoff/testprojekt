@@ -1,8 +1,11 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 
+import { SourceViewer } from '@/components/sources/source-viewer'
+import { Button } from '@/components/ui/button'
+import { deleteSource, type SourceState } from '@/lib/sources/actions'
 import { anyPending, needsTrigger, statusView } from '@/lib/sources/status'
 
 /**
@@ -49,9 +52,13 @@ const TONE_CLASSES = {
   err: 'bg-err-soft text-err'
 } as const
 
-export function SourceList({ sources }: { sources: SourceItem[] }) {
+export function SourceList({ notebookId, sources }: { notebookId: string; sources: SourceItem[] }) {
   const router = useRouter()
   const lastTriggered = useRef<Map<string, number>>(new Map())
+
+  // Welche Quelle gerade gelesen wird. Höchstens eine — zwei offene Dialoge
+  // gäbe es ohnehin nicht, `showModal()` stapelt sie.
+  const [gelesen, setGelesen] = useState<string | null>(null)
 
   const offen = anyPending(sources.map((s) => s.status))
 
@@ -100,6 +107,7 @@ export function SourceList({ sources }: { sources: SourceItem[] }) {
     <ul className="flex flex-col gap-2" aria-busy={offen}>
       {sources.map((source) => {
         const view = statusView(source.status)
+        const lesbar = source.status === 'ready'
         return (
           <li
             key={source.id}
@@ -109,7 +117,24 @@ export function SourceList({ sources }: { sources: SourceItem[] }) {
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-semibold">{source.title}</p>
+                {/*
+                  Der Titel ist nur dann ein Bedienelement, wenn es etwas zu
+                  öffnen gibt. Ein Knopf, der bei einer noch nicht verarbeiteten
+                  Quelle einen leeren Dialog aufmacht, wäre ein Angebot, das
+                  sein Versprechen bricht — die Abschnitte entstehen erst am
+                  Ende der Verarbeitung.
+                */}
+                {lesbar ? (
+                  <button
+                    type="button"
+                    onClick={() => setGelesen(source.id)}
+                    className="block max-w-full truncate rounded-control text-left font-semibold hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                  >
+                    {source.title}
+                  </button>
+                ) : (
+                  <p className="truncate font-semibold">{source.title}</p>
+                )}
                 <p className="mt-0.5 text-xs text-faint-ink">
                   {source.kind.toUpperCase()}
                   {source.page_count ? ` · ${source.page_count} Seiten` : ''}
@@ -132,9 +157,57 @@ export function SourceList({ sources }: { sources: SourceItem[] }) {
               // Nutzer kann etwas anderes hochladen.
               <p className="mt-2 text-sm text-err">{source.error_message}</p>
             ) : null}
+
+            <SourceDelete notebookId={notebookId} source={source} />
           </li>
         )
       })}
+
+      {gelesen ? (
+        <SourceViewer sourceId={gelesen} chunkIndex={null} onClose={() => setGelesen(null)} />
+      ) : null}
     </ul>
+  )
+}
+
+/**
+ * Löschen mit Bestätigung — dasselbe `<details>`-Muster wie beim Notebook.
+ *
+ * Kein `confirm()`: Das funktioniert ohne JavaScript nicht, ist schlecht
+ * gestaltbar und blockiert den Ereignisfluss der Seite. Ein aufklappbarer
+ * Abschnitt hält den gefährlichen Knopf hinter einem bewussten Schritt und
+ * bleibt mit der Tastatur bedienbar.
+ *
+ * Die Rückfrage ist hier nicht bloß Höflichkeit: Eine Quelle wieder
+ * herzustellen heißt, sie erneut hochzuladen **und** erneut einbetten zu
+ * lassen — das kostet Kontingent, nicht nur Zeit.
+ */
+function SourceDelete({ notebookId, source }: { notebookId: string; source: SourceItem }) {
+  const [status, loeschen, laeuft] = useActionState<SourceState, FormData>(
+    deleteSource.bind(null, notebookId, source.id),
+    {}
+  )
+
+  return (
+    <details className="mt-2">
+      <summary className="inline-block cursor-pointer rounded-control text-xs text-muted-ink hover:text-err focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        Entfernen
+      </summary>
+
+      <form action={loeschen} className="mt-2">
+        <p className="mb-2 text-xs text-muted-ink">
+          Entfernt die Quelle samt ihrer Abschnitte. Bereits gegebene Antworten behalten ihre
+          Belege.
+        </p>
+        <Button type="submit" variant="danger" size="compact" disabled={laeuft}>
+          {laeuft ? 'Wird entfernt …' : `„${source.title}“ entfernen`}
+        </Button>
+        {status.error ? (
+          <p role="alert" className="mt-2 text-xs text-err">
+            {status.error}
+          </p>
+        ) : null}
+      </form>
+    </details>
   )
 }

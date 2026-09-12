@@ -156,7 +156,18 @@ export function AddSource({ notebookId }: { notebookId: string }) {
         Quelle hinzufügen
       </h3>
 
-      <div role="tablist" aria-label="Art der Quelle" className="mt-3 flex gap-1">
+      {/*
+        `flex-wrap`, weil die drei Reiter in der Spalte sonst schrumpfen statt
+        umzubrechen: Flex-Elemente haben `flex-shrink: 1`, und als die Spalte
+        noch 264px breit war, fraß das die Polsterung des letzten auf — „Text"
+        klebte am Kartenrand. Kein waagerechter Überlauf, also auch kein roter
+        Test; nur ein Knopf, der aussieht, als wäre er verrutscht.
+
+        Die Spalte ist inzwischen breiter und es passt. Die Zeile bleibt
+        trotzdem: Sie kostet nichts und hält den Fall auch dann aus, wenn
+        später ein vierter Reiter dazukommt.
+      */}
+      <div role="tablist" aria-label="Art der Quelle" className="mt-3 flex flex-wrap gap-1">
         {MODES.map((m) => (
           <button
             key={m.id}

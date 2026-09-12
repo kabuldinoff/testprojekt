@@ -104,8 +104,12 @@ describe('chunkDocument · Trennstellen', () => {
     // Geprüft wird das ENDE, nicht der Anfang. Durch die Überlappung beginnt
     // kein Abschnitt an einem Absatzumbruch — er beginnt ein Stück davor, im
     // vorigen Absatz. Der Absatz ist die Stelle, an der getrennt wird.
+    //
+    // Die Grenzen liegen **vor** den beiden Zeilenumbrüchen, nicht dahinter:
+    // `charEnd` folgt seit `alsChunk` dem getrimmten Inhalt, und der endet am
+    // letzten sichtbaren Zeichen.
     const enden = chunks.map((c) => c.charEnd)
-    const absatzGrenzen = [1002, 2004, 3006] // 1000 Zeichen + je zwei \n
+    const absatzGrenzen = [1000, 2002, 3004]
     const treffer = absatzGrenzen.filter((g) => enden.includes(g))
     expect(treffer.length, `Enden: ${enden.join(', ')}`).toBeGreaterThan(0)
   })
@@ -140,19 +144,41 @@ describe('chunkDocument · Trennstellen', () => {
 })
 
 describe('chunkDocument · Rückverweise', () => {
-  it('charStart und charEnd zeigen auf den echten Text', () => {
+  it('charStart und charEnd zeigen exakt auf den Abschnitt — ohne trim()', () => {
+    // Das ist die Zusicherung, auf der die anklickbaren Zitate **und** das
+    // Zusammensetzen im Betrachter beruhen.
+    //
+    // Vorher stand hier `.trim()` auf der rechten Seite, und genau diese
+    // Lockerung war der Fehler: Die Positionen zeigten auf den Rohbereich,
+    // der Inhalt war die getrimmte Fassung, und die Differenz — der
+    // abgeschnittene Leerraum — ließ sich aus den gespeicherten Daten nicht
+    // mehr herleiten. `reassemble.ts` musste sie schätzen und verlor bei einer
+    // langen Leerraumstrecke lautlos Text.
     const text = prose(5000)
     for (const c of chunkDocument([page(text)])) {
-      // Das ist die Zusicherung, auf der die anklickbaren Zitate beruhen:
-      // der Ausschnitt an diesen Positionen muss den Abschnitt enthalten.
-      expect(text.slice(c.charStart, c.charEnd).trim()).toBe(c.content)
+      expect(text.slice(c.charStart, c.charEnd)).toBe(c.content)
+    }
+  })
+
+  it('auch bei viel Leerraum an den Grenzen', () => {
+    // Der Fall aus dem Review, in der Form, die ihn auslöst: ein Satzende,
+    // dann eine lange Leerraumstrecke — Tabellenlayout aus einem PDF.
+    const satz = 'Der Umsatz im Segment stieg deutlich an. '
+    const text = satz.repeat(25) + ' '.repeat(120) + satz.repeat(60)
+    const chunks = chunkDocument([page(text)])
+    expect(chunks.length).toBeGreaterThan(1)
+    for (const c of chunks) {
+      expect(text.slice(c.charStart, c.charEnd), `Abschnitt ${c.index}`).toBe(c.content)
     }
   })
 
   it('die Bereiche laufen vorwärts und decken den Text ab', () => {
-    const chunks = chunkDocument([page(prose(5000))])
+    const text = prose(5000)
+    const chunks = chunkDocument([page(text)])
     expect(chunks[0]!.charStart).toBe(0)
-    expect(chunks[chunks.length - 1]!.charEnd).toBe(5000)
+    // Nicht 5000: `prose` endet auf ein Leerzeichen, und das gehört nicht mehr
+    // zum Abschnitt.
+    expect(chunks[chunks.length - 1]!.charEnd).toBe(text.trimEnd().length)
     for (const c of chunks) expect(c.charEnd).toBeGreaterThan(c.charStart)
   })
 })

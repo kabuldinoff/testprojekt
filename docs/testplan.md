@@ -20,6 +20,8 @@ Prüfpunkt zugeordnet werden kann.
 
 | b5 | `e2e/b5-audio-overview.spec.ts` | Aus den Quellen entsteht ein zweistimmiger Überblick, ausgeliefert über eine signierte Adresse, mit Transkript; ein erschöpftes Kontingent hinterlässt **`script_only`** statt eines endlosen Ladebalkens; mit Mistral ist der Überblick gesperrt und nennt den Grund; ohne verarbeitete Quelle wird nichts angeboten; ein fremdes Notebook ergibt **404** |
 
+| b6 | `e2e/b6-source-text.spec.ts` | Der Titel einer bereiten Quelle öffnet ihren Text; der **zusammengesetzte Text enthält jeden Satz genau einmal** (die Abschnitte überlappen einander um je 180 Zeichen); ein Beleg führt an seine Stelle im Dokument und markiert **genau** die Passage, die er behauptet; Escape schließt; eine unverarbeitete Quelle bietet keinen Betrachter an; Entfernen braucht zwei Schritte und nimmt Abschnitte **und** Storage-Datei mit — geprüft mit dem Secret Key, weil eine Policy eine liegengebliebene Datei sonst bloß verbärge; eine gelöschte Quelle nimmt ihre Belege nicht mit |
+
 | d1 | `e2e/d1-landing-seo.spec.ts` | Startseite mit Überschrift, Einstiegen und gültigem JSON-LD; der Datenfluss-Text stammt aus derselben Quelle wie in der App; `robots.txt` sperrt den Arbeitsbereich; die Sitemap nennt **nur** Indexierbares; `llms.txt` beschreibt und weist nicht an; `/app` trägt `noindex`; das Vorschaubild wird ausgeliefert |
 
 | c1 | `e2e/c1-responsive.spec.ts` | Derselbe Arbeitsbereich auf drei Breiten: Desktop drei Spalten nebeneinander (geprüft über die Kästen, nicht über den Augenschein), Tablet Chat plus höchstens ein Seitenpanel, Mobil einer zur Zeit mit Chat als Voreinstellung. Und die eigentliche Zusicherung: **ein Wechsel verliert das laufende Gespräch nicht.** Keine Breite scrollt waagerecht |

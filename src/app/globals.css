@@ -37,6 +37,12 @@
      vergleicht beide. */
   --mark-radius: 7px;
 
+  /* Die Ecke der Zitat-Markierung im Quellenbetrachter. Bewusst **nicht**
+     --mark-radius: Die Plakette ist 28px hoch, eine Textzeile knapp 20 — 7px
+     ergäben dort eine Pille um einen halben Satz. Drei Pixel nehmen der Fläche
+     die Härte, ohne sie zu einer Form zu machen. */
+  --highlight-radius: 3px;
+
   /* Die Größe, bei der das „N" die Plakette füllt, ohne an den Rand zu
      stoßen. Fett gesetzt liegt sie damit unter der Schwelle für „großen
      Text" (18.66px) — der Kontrast wird deshalb gegen die strenge Schwelle
@@ -70,8 +76,22 @@
      AA verfehlt. Dunkle Tinte darauf ergibt 5.68:1. Im hellen Theme ist es
      umgekehrt. Nachgemessen, siehe src/lib/__tests__/contrast.test.ts. */
   --on-brand: #0e1424;
+
+  /* Vordergrund auf --accent, also auf der **vollen** Goldfläche.
+
+     Nicht zu verwechseln mit --accent-ink: das ist die Schrift auf
+     --accent-soft, der blassen Tönung. Die Verwechslung war ein echter Fehler
+     und kein theoretischer — der aktive Zitat-Chip setzte --accent-ink auf
+     --accent, und weil beide im Dunkeln #faef70 sind, ergab das 1.00:1. Die
+     Nummer war restlos unsichtbar. Im Hellen fiel es nicht auf, weil
+     --accent-ink dort dunkel ist.
+
+     Derselbe Wert in beiden Ausprägungen, weil --accent in beiden derselbe
+     ist: Eine Fläche, die nicht wechselt, braucht keine Tinte, die wechselt. */
+  --on-accent: #0e1424; /* 15.42:1 auf --accent */
+
   --accent-soft: #2a2a18;
-  --accent-ink: #faef70;
+  --accent-ink: #faef70; /* 12.23:1 auf --accent-soft */
 
   --ink: #edf1f7;
   --muted-ink: #a8b0be;
@@ -104,6 +124,13 @@
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-pop: 0 8px 16px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.45);
 
+  /* Der Hintergrund hinter einem modalen Dialog.
+
+     Im Dunkeln kräftiger als im Hellen, aus demselben Grund wie bei den
+     Schatten: Auf dunklem Grund trägt eine Abdunklung weniger, weil weniger
+     Kontrast zwischen Fläche und Schleier bleibt. */
+  --backdrop: rgb(0 0 0 / 0.6);
+
   /* Das Markenzeichen: das „N" als Plakette, wie das Symbol im Browser-Tab.
      Die Fläche ist in beiden Ausprägungen dieselbe dunkle Farbe — so sieht
      das Zeichen überall gleich aus, egal auf welchem Grund es sitzt. Nur der
@@ -127,6 +154,7 @@
   --accent: #faef70;
   --accent-soft: #fefde8;
   --on-brand: #ffffff;
+  --on-accent: #0e1424; /* wie im Dunkeln — --accent ist dieselbe Fläche */
   --accent-ink: #7e752c; /* 4.57:1 auf --accent-soft */
 
   --ink: #0e1424;
@@ -169,6 +197,8 @@
   --shadow-card: 0 1px 2px rgb(14 20 36 / 0.04), 0 8px 24px rgb(14 20 36 / 0.06);
   --shadow-pop: 0 8px 16px rgb(14 20 36 / 0.08), 0 24px 48px rgb(14 20 36 / 0.1);
 
+  --backdrop: rgb(14 20 36 / 0.45);
+
   /* Fläche bleibt dunkel; der Buchstabe ist hier das Blau aus dem Tab-Symbol
      (#5B8DEF), nicht das hellere brand-600 dieser Ausprägung — auf dunklem
      Grund braucht es den helleren Ton. */
@@ -186,6 +216,8 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
   --color-on-brand: var(--on-brand);
+  --color-on-accent: var(--on-accent);
+  --color-backdrop: var(--backdrop);
 
   --color-ink: var(--ink);
   --color-muted-ink: var(--muted-ink);
@@ -213,6 +245,7 @@
   --color-mark-bg: var(--mark-bg);
   --color-mark-ink: var(--mark-ink);
   --radius-mark: var(--mark-radius);
+  --radius-highlight: var(--highlight-radius);
   --text-mark: var(--mark-text-size);
   --text-mark-word: var(--mark-word-size);
 
@@ -342,6 +375,20 @@
     background-color: var(--canvas);
   }
 
+  /* Die Klappknöpfe sind das Gegenstück zur Umschaltleiste: Sie gelten nur
+     dort, wo alle drei Spalten nebeneinander stehen. Unterhalb von 1280px
+     entscheidet die Leiste, welcher Bereich sichtbar ist — zwei Bedienelemente
+     für dieselbe Frage wären dort ein Widerspruch, den der Nutzer auflösen
+     müsste.
+
+     Und wie bei .workspace-umschalter steht die Basisregel **vor** der Media
+     Query: Bei gleicher Spezifität gewinnt die spätere. */
+  .workspace-klapper {
+    display: none;
+    flex-shrink: 0;
+    gap: 0.25rem;
+  }
+
   .workspace-spalten {
     display: flex;
     flex: 1;
@@ -415,7 +462,7 @@
   /* ── Tablet: Chat immer, daneben höchstens ein Seitenpanel ────────────── */
   @media (48rem <= width < 80rem) {
     .workspace-seite {
-      width: 17rem; /* 272px — etwas schmaler als auf Desktop */
+      width: 19rem; /* 304px — etwas schmaler als auf Desktop */
       flex-shrink: 0;
     }
 
@@ -432,13 +479,36 @@
       display: none;
     }
 
+    .workspace-klapper {
+      display: flex;
+    }
+
     .workspace-seite {
-      width: 16.5rem; /* 264px, Canvas */
+      width: 20rem; /* 320px */
       flex-shrink: 0;
     }
 
+    /* 384px, und die Zahl ist gemessen, nicht gegriffen.
+
+       Chrome zeichnet im eingebauten Audio-Bedienelement eine Zeitleiste, die
+       linear mit der Breite wächst: rund `Breite − 235px`. In der alten
+       300px-Spalte blieben dem Element nach Spalten- und Kartenpolsterung
+       236px, also ein 1px-Stummel — die Zeit stand da, aber es gab nichts zu
+       ziehen. Hier bleiben 320px und damit etwa 85px Leiste. Nachgemessen in
+       Chrome über gestaffelte Breiten, nicht geschätzt.
+
+       Breiter wäre besser und ist trotzdem falsch: Bei 1280px blieben dem Chat
+       schon jetzt 576px. Wer mehr Leiste braucht, klappt die Gegenseite ein —
+       dafür gibt es die Knöpfe. */
     .workspace-seite--rechts {
-      width: 18.75rem; /* 300px, Canvas */
+      width: 24rem;
+    }
+
+    /* Eingeklappt. Die Regel steht **nur** hier: Unterhalb von 1280px
+       entscheidet `data-aktiv`, und ein zweites Kriterium könnte einen Bereich
+       verstecken, den die Umschaltleiste gerade als aktiv anzeigt. */
+    [data-bereich][data-offen='false'] {
+      display: none;
     }
   }
 }

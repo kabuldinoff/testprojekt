@@ -56,6 +56,46 @@ export async function createUser(request: APIRequestContext, prefix: string): Pr
   return { email, password, accessToken: body.access_token, userId: body.user.id }
 }
 
+/**
+ * Schaut mit dem Secret Key nach, an RLS vorbei.
+ *
+ * Nur für **Aufräum-Prüfungen** gedacht, und dort unverzichtbar: Ob eine Datei
+ * gelöscht wurde, lässt sich mit dem Token des Nutzers gar nicht feststellen.
+ * Eine Policy, die sie verbirgt, sähe aus wie eine Datei, die es nicht mehr
+ * gibt — der Test wäre grün, und das Speicherkontingent liefe trotzdem voll.
+ *
+ * Für alles andere gilt weiter `asUser`: Ein Test, der mit erhöhten Rechten
+ * prüft, prüft nicht das, was der Nutzer erlebt.
+ */
+export function asService(request: APIRequestContext) {
+  const key = process.env.SUPABASE_SECRET_KEY ?? ''
+  const headers = { apikey: key, Authorization: `Bearer ${key}` }
+
+  return {
+    get: (path: string) => request.get(`${SUPABASE_URL}/rest/v1/${path}`, { headers }),
+
+    /**
+     * Die Dateinamen unmittelbar unter einem Präfix.
+     *
+     * Die Storage-API listet **nicht** rekursiv: Auf einer Ebene mit
+     * Unterordnern kämen die Ordnernamen zurück, nicht die Dateien darin. Der
+     * Aufrufer übergibt deshalb den vollen Ordner, nicht die Wurzel.
+     */
+    storageNames: async (bucket: string, prefix: string) => {
+      const antwort = await request.post(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        data: { prefix, limit: 100 }
+      })
+      if (!antwort.ok()) {
+        throw new Error(
+          `Storage-Liste fehlgeschlagen (${antwort.status()}): ${await antwort.text()}`
+        )
+      }
+      return ((await antwort.json()) as Array<{ name: string }>).map((e) => e.name)
+    }
+  }
+}
+
 /** Ruft PostgREST als bestimmter Nutzer auf — genau das, was ein Angreifer täte. */
 export function asUser(request: APIRequestContext, user: TestUser) {
   const headers = {
