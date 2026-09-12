@@ -159,11 +159,29 @@ test('keine Breite erzeugt seitliches Scrollen', async ({ page }) => {
     ['Mobil', MOBIL]
   ] as const) {
     await page.setViewportSize(groesse)
+    await page.waitForTimeout(200)
+
     // Waagerechtes Scrollen ist auf einer Arbeitsfläche immer ein Fehler: Es
     // versteckt Inhalt hinter einer Geste, die niemand vermutet.
-    const scrollt = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth
-    )
-    expect(scrollt, `${name} scrollt waagerecht`).toBe(false)
+    //
+    // Geprüft wird das Dokument **und jeder eigene Scrollbereich**. Die
+    // Spalten scrollen für sich, und `.workspace-spalten` schneidet
+    // Überstehendes mit `overflow: hidden` ab — ein zu breiter Inhalt fiele
+    // dort also lautlos weg, ohne dass das Dokument je breiter würde. Genau
+    // deshalb reicht die Prüfung am Dokumentwurzelelement nicht.
+    const ueberlauf = await page.evaluate(() => {
+      const stellen: string[] = []
+      if (document.documentElement.scrollWidth > window.innerWidth) stellen.push('Dokument')
+      for (const el of document.querySelectorAll<HTMLElement>(
+        '.workspace-spalten, .workspace-seite, .workspace-mitte'
+      )) {
+        if (el.scrollWidth > el.clientWidth + 1) {
+          stellen.push(el.className + ` (${el.scrollWidth} > ${el.clientWidth})`)
+        }
+      }
+      return stellen
+    })
+
+    expect(ueberlauf, `${name} läuft waagerecht über`).toEqual([])
   }
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 /**
  * Der Arbeitsbereich in drei Ausprägungen — mit **einem** Markup.
@@ -55,9 +55,50 @@ export function Workspace({
   studio: ReactNode
 }) {
   const [aktiv, setAktiv] = useState<Bereich>('chat')
+  const chatRef = useRef<HTMLElement>(null)
+
+  /**
+   * Springt zum Chat.
+   *
+   * Der Grund: In der Dokumentreihenfolge steht die Quellenspalte vor dem
+   * Chat. Wer mit der Tastatur arbeitet, tabbt sich sonst durch Quellenliste,
+   * Hinzufügen-Formular und Einstellungen, bevor er zum Eingabefeld kommt —
+   * bei jedem Seitenaufruf.
+   *
+   * Als Knopf und nicht als Sprungmarke: Unterhalb von 1280px kann der Chat
+   * gerade ausgeblendet sein, und ein `href="#…"` auf ein Element mit
+   * `display: none` bewirkt nichts. Der Knopf schaltet erst um und setzt dann
+   * den Fokus.
+   */
+  function zumChat() {
+    setAktiv('chat')
+    // Nach dem Zustandswechsel, damit das Ziel sichtbar ist.
+    requestAnimationFrame(() => chatRef.current?.focus())
+  }
 
   return (
     <div className="workspace">
+      {/*
+        Sichtbar nur mit Tastaturfokus. Ein immer sichtbarer Sprunglink wäre
+        für die Mehrheit Lärm, ein unsichtbarer für die Minderheit unbrauchbar
+        — `sr-only` mit `focus:not-sr-only` ist der übliche Kompromiss.
+
+        **Jede** Gestaltung steht hinter `focus:`, auch Polsterung und Farbe.
+        Der erste Anlauf schrieb `px-4 py-2` ohne Präfix daneben, und das
+        Element war ohne Fokus 32 Pixel breit statt einen: `sr-only` setzt
+        `padding: 0`, und die Polsterungsklasse steht im erzeugten Stylesheet
+        dahinter. Tailwind v4 löst solche Konflikte über die Reihenfolge im
+        Stylesheet, nicht über die im class-Attribut — dieselbe Falle, die im
+        Kommentar von `ui/button.tsx` beschrieben ist.
+      */}
+      <button
+        type="button"
+        onClick={zumChat}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-10 focus:rounded-control focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-brand"
+      >
+        Zum Chat springen
+      </button>
+
       <div className="workspace-kopf">
         <div className="min-w-0 flex-1">{titel}</div>
 
@@ -102,6 +143,11 @@ export function Workspace({
           das Notebook geöffnet hat.
         */}
         <section
+          ref={chatRef}
+          // -1: nicht in der Tabulatorreihenfolge, aber per Skript
+          // fokussierbar. Sonst landete der Sprunglink auf einem Element, das
+          // den Fokus gar nicht annehmen kann.
+          tabIndex={-1}
           data-bereich="chat"
           data-aktiv={aktiv === 'chat'}
           aria-labelledby="abschnitt-chat"

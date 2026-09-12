@@ -56,10 +56,19 @@ async function themaSetzen(page: Page, thema: (typeof THEMES)[number]) {
   const aktuell = await page.evaluate(() =>
     document.documentElement.classList.contains('light') ? 'light' : 'dark'
   )
-  if (aktuell !== thema) {
-    await page.getByRole('button', { name: 'Design umschalten' }).first().click()
-    await page.waitForTimeout(300)
-  }
+  if (aktuell === thema) return
+
+  await page.getByRole('button', { name: 'Design umschalten' }).first().click()
+
+  // Auf die Klasse warten, nicht auf eine Zeitspanne. Die erste Fassung
+  // wartete feste 300 ms — dauerte die Umschaltung länger, prüfte axe das
+  // **alte** Theme und meldete es als geprüft. Ein grüner Lauf, der die eine
+  // Ausprägung nie gesehen hat.
+  await page.waitForFunction(
+    (gewuenscht) =>
+      (document.documentElement.classList.contains('light') ? 'light' : 'dark') === gewuenscht,
+    thema
+  )
 }
 
 for (const thema of THEMES) {
@@ -110,20 +119,79 @@ test('der Arbeitsbereich ist zugänglich, mit Quelle, Antwort und Notiz', async 
   await chat.getByRole('button', { name: 'Als Notiz speichern' }).click()
   await expect(chat.getByText('Als Notiz gespeichert.')).toBeVisible()
 
-  await pruefen(page, 'Arbeitsbereich (voll)')
+  // In **beiden** Ausprägungen. Die erste Fassung prüfte nur die dunkle, weil
+  // sie der Standard ist — Verstöße in der hellen wären nie aufgefallen, und
+  // der Test hätte trotzdem „zugänglich" gemeldet.
+  for (const thema of THEMES) {
+    await themaSetzen(page, thema)
+    await pruefen(page, `Arbeitsbereich voll (${thema})`)
+  }
 })
 
-test('die Tastatur erreicht den Chat ohne Umweg über alles davor', async ({ page }) => {
+test('der Sprunglink führt mit einem Tastendruck zum Chat', async ({ page }) => {
+  // Der Test hieß zuerst „die Tastatur erreicht den Chat" und erreichte ihn
+  // nie: Er drückte achtmal Tab auf der **leeren Übersicht**, ohne je ein
+  // Notebook zu öffnen. Der Name versprach etwas, das er nicht prüfte.
+  //
+  // Beim Beheben stellte sich heraus, dass die Zusicherung selbst fehlte: In
+  // der Dokumentreihenfolge steht die Quellenspalte vor dem Chat. Wer mit der
+  // Tastatur arbeitet, tabbt sich sonst bei jedem Seitenaufruf durch
+  // Quellenliste, Hinzufügen-Formular und Einstellungen. Der Sprunglink ist
+  // die Antwort darauf, und hier wird er geprüft.
   await page.goto('/registrieren')
   await page.getByLabel('E-Mail-Adresse').fill(uniqueEmail('tastatur'))
   await page.getByLabel('Passwort').fill(PASSWORD)
   await page.getByRole('button', { name: 'Konto anlegen' }).click()
   await expect(page).toHaveURL(/\/app$/)
 
-  // Jedes Element, das per Tabulator erreichbar ist, muss auch einen
-  // sichtbaren Fokus bekommen. Geprüft wird der Umriss, nicht die Farbe: Ein
-  // Fokusring, den `outline: none` entfernt hat, macht die Anwendung für
-  // Tastaturnutzer unbedienbar, und genau das passiert versehentlich.
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Tastatur-Notebook')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+
+  const sprunglink = page.getByRole('button', { name: 'Zum Chat springen' })
+
+  // Visuell verborgen, bis der Fokus ihn erreicht — sonst wäre er für die
+  // Mehrheit Lärm.
+  //
+  // Geprüft wird die Größe, nicht Playwrights Sichtbarkeit: `sr-only`
+  // arbeitet mit einem Ein-Pixel-Kästchen und `clip`, nicht mit
+  // `display: none`. Für Playwright ist das Element damit „sichtbar", für
+  // jedes Auge nicht. Die Breite sagt die Wahrheit.
+  const breite = async () => (await sprunglink.boundingBox())?.width ?? 0
+  expect(await breite(), 'Sprunglink ist ohne Fokus sichtbar').toBeLessThanOrEqual(2)
+
+  await page.keyboard.press('Tab')
+  await expect(sprunglink).toBeFocused()
+  expect(await breite(), 'Sprunglink bleibt bei Fokus unsichtbar').toBeGreaterThan(80)
+
+  await page.keyboard.press('Enter')
+
+  // Der Fokus steht jetzt im Chat-Bereich, nicht irgendwo davor.
+  await expect(page.getByRole('region', { name: 'Chat' })).toBeFocused()
+
+  // Und von dort ist das Eingabefeld in Reichweite, ohne die Quellenspalte zu
+  // durchqueren.
+  await page.keyboard.press('Tab')
+  const fokussiert = await page.evaluate(() => {
+    const el = document.activeElement
+    const chat = document.querySelector('[data-bereich="chat"]')
+    return { imChat: chat?.contains(el) ?? false, marke: el?.tagName ?? '' }
+  })
+  expect(fokussiert.imChat, `Fokus landete außerhalb des Chats (${fokussiert.marke})`).toBe(true)
+})
+
+test('jedes per Tabulator erreichbare Element zeigt seinen Fokus', async ({ page }) => {
+  await page.goto('/registrieren')
+  await page.getByLabel('E-Mail-Adresse').fill(uniqueEmail('fokus'))
+  await page.getByLabel('Passwort').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Konto anlegen' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+
+  // Geprüft wird der Umriss, nicht die Farbe: Ein Fokusring, den
+  // `outline: none` entfernt hat, macht die Anwendung für Tastaturnutzer
+  // unbedienbar — und das passiert versehentlich, weil `outline: none` in
+  // vielen Zurücksetzungen steht.
   for (let i = 0; i < 8; i++) {
     await page.keyboard.press('Tab')
     const sichtbar = await page.evaluate(() => {

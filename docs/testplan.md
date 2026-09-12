@@ -23,7 +23,7 @@ Prüfpunkt zugeordnet werden kann.
 | d1 | `e2e/d1-landing-seo.spec.ts` | Startseite mit Überschrift, Einstiegen und gültigem JSON-LD; der Datenfluss-Text stammt aus derselben Quelle wie in der App; `robots.txt` sperrt den Arbeitsbereich; die Sitemap nennt **nur** Indexierbares; `llms.txt` beschreibt und weist nicht an; `/app` trägt `noindex`; das Vorschaubild wird ausgeliefert |
 
 | c1 | `e2e/c1-responsive.spec.ts` | Derselbe Arbeitsbereich auf drei Breiten: Desktop drei Spalten nebeneinander (geprüft über die Kästen, nicht über den Augenschein), Tablet Chat plus höchstens ein Seitenpanel, Mobil einer zur Zeit mit Chat als Voreinstellung. Und die eigentliche Zusicherung: **ein Wechsel verliert das laufende Gespräch nicht.** Keine Breite scrollt waagerecht |
-| c2 | `e2e/c2-a11y.spec.ts` | **axe** gegen WCAG 2.1 AA über Startseite, Anmeldung, Registrierung (in **beiden** Ausprägungen), Übersicht, neues Notebook und den vollen Arbeitsbereich mit Quelle, Antwort, aufgeklapptem Beleg und Notiz. Dazu: jedes per Tabulator erreichbare Element hat einen sichtbaren Fokus |
+| c2 | `e2e/c2-a11y.spec.ts` | **axe** gegen WCAG 2.1 AA über Startseite, Anmeldung, Registrierung (in **beiden** Ausprägungen), Übersicht, neues Notebook und den vollen Arbeitsbereich mit Quelle, Antwort, aufgeklapptem Beleg und Notiz. Dazu: der **Sprunglink** führt mit einem Tastendruck in den Chat, und jedes per Tabulator erreichbare Element hat einen sichtbaren Fokus |
 
 Geplant: `d2-design-tokens`.
 
