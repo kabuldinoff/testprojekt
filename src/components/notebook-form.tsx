@@ -40,11 +40,22 @@ const DESCRIPTION_ROWS = 3
 export function NotebookForm({
   action,
   submitLabel,
-  defaults
+  defaults,
+  titleLabel = 'Titel'
 }: {
   action: (previous: FormState, formData: FormData) => Promise<FormState>
   submitLabel: string
   defaults?: { title?: string; emoji?: string | null; description?: string | null }
+  /**
+   * Beschriftung des Titelfelds.
+   *
+   * Auf `/app/neu` steht das Formular allein und „Titel" ist eindeutig. Im
+   * Arbeitsbereich liegt es in derselben Spalte wie das Formular zum
+   * Hinzufügen einer Quelle, das ebenfalls einen Titel hat — zwei gleich
+   * beschriftete Felder in einer Landmarke bedeuten für jemanden am
+   * Screenreader zweimal „Titel, Eingabefeld" ohne Unterschied.
+   */
+  titleLabel?: string
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, {})
   // useId statt einer festen Zeichenkette: eine feste ID kollidiert, sobald
@@ -69,7 +80,7 @@ export function NotebookForm({
         </div>
         <div className="flex-1">
           <Field
-            label="Titel"
+            label={titleLabel}
             name="title"
             defaultValue={defaults?.title ?? ''}
             required

@@ -215,9 +215,14 @@ describe('die Schwellen sind die aus WCAG 2.1', () => {
  * Schein nichts übrig bliebe.
  *
  * Was diese Rechnung nicht leisten kann, ist die Frage „welcher Text liegt
- * tatsächlich über welcher Dichte" — das hängt vom Layout ab und gehört in
- * eine Messung im Browser. `e2e/c2-a11y` wird sie übernehmen; dort lässt sich
- * die gerenderte Farbe hinter einem Element auslesen, statt sie zu rechnen.
+ * tatsächlich über welcher Dichte" — das hängt vom Layout ab. Eine Messung im
+ * Browser wäre die Antwort, verlangt aber das Aufnehmen und Dekodieren eines
+ * Bildes; sie ist nicht gebaut, und `e2e/c2-a11y` hält ausdrücklich fest,
+ * warum dort nichts steht.
+ *
+ * Bis dahin trägt diese Rechnung, und sie trägt mit Reserve: Sie setzt die
+ * volle Deckkraft an, während der dichteste Punkt des Verlaufs über dem
+ * sichtbaren Rand liegt. Sie ist also strenger als die Wirklichkeit.
  */
 describe('Überschrift über dem Verlauf', () => {
   for (const [name, block] of Object.entries(themes)) {

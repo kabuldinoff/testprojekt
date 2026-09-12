@@ -20,6 +20,7 @@ import { ChatPanel } from '@/components/chat/chat-panel'
 import { ProviderSwitch } from '@/components/chat/provider-switch'
 import { NotesPanel, type NoteItem } from '@/components/notes/notes-panel'
 import { AudioOverview, type AudioOverviewItem } from '@/components/studio/audio-overview'
+import { Workspace } from '@/components/workspace/workspace'
 import { NotebookDelete } from '@/components/notebook-delete'
 import type { StoredMessage } from '@/lib/chat/ui'
 import { providerOrDefault } from '@/lib/llm/registry'
@@ -192,133 +193,145 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
   const remove = deleteNotebook.bind(null, notebook.id)
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
-      <Link href="/app" className="text-sm text-muted-ink hover:text-ink">
-        ← Zurück zur Übersicht
-      </Link>
-
-      {/*
-        aria-describedby verknüpft die Beschreibung mit der Überschrift. Ein
-        Screenreader liest sie damit zusammen vor, statt sie als losen Absatz
-        zu behandeln — und Tests können sie über die zugängliche Beschreibung
-        finden, statt über die Elementhierarchie.
-      */}
-      <h1
-        className="mt-4 text-2xl font-extrabold tracking-tight"
-        aria-describedby={notebook.description ? 'notebook-summary' : undefined}
-      >
-        {notebook.emoji ? `${notebook.emoji} ` : ''}
-        {notebook.title}
-      </h1>
-      {notebook.description ? (
-        <p id="notebook-summary" className="mt-1 text-sm text-muted-ink">
-          {notebook.description}
-        </p>
-      ) : null}
-
-      {/*
-        `aria-labelledby` macht aus dem <section> eine benannte Landmarke. Ohne
-        zugänglichen Namen hat ein <section> überhaupt keine Rolle — für die
-        Navigation per Screenreader ist es dann ein <div>. Nebeneffekt, der
-        beim Testen half: die Abschnitte werden adressierbar, statt dass ein
-        `getByLabel('Titel')` quer über die Seite greift.
-      */}
-      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-quellen">
-        <h2 id="abschnitt-quellen" className="text-base font-bold">
-          Quellen
-        </h2>
-        {sourcesError ? (
-          <p
-            role="alert"
-            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+    <Workspace
+      titel={
+        <div className="min-w-0">
+          <h1
+            className="truncate text-base font-bold tracking-tight"
+            aria-describedby={notebook.description ? 'notebook-summary' : undefined}
           >
-            Die Quellen konnten nicht geladen werden. Bitte die Seite neu laden.
-          </p>
-        ) : (
-          <SourceList sources={sources} />
-        )}
-        <AddSource notebookId={notebook.id} />
-      </section>
+            {notebook.emoji ? `${notebook.emoji} ` : ''}
+            {notebook.title}
+          </h1>
+          {notebook.description ? (
+            <p id="notebook-summary" className="truncate text-xs text-muted-ink">
+              {notebook.description}
+            </p>
+          ) : null}
+        </div>
+      }
+      quellen={
+        <>
+          <h2 id="abschnitt-quellen" className="mb-3 text-sm font-bold">
+            Quellen
+          </h2>
+          {sourcesError ? (
+            <p
+              role="alert"
+              className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+            >
+              Die Quellen konnten nicht geladen werden. Bitte die Seite neu laden.
+            </p>
+          ) : (
+            <SourceList sources={sources} />
+          )}
 
-      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-chat">
-        <h2 id="abschnitt-chat" className="text-base font-bold">
-          Chat
-        </h2>
-        <ProviderSwitch
-          notebookId={notebook.id}
-          current={providerOrDefault(notebook.chat_provider).id}
-        />
-        {messagesError ? (
-          <p
-            role="alert"
-            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+          <div className="mt-4">
+            <AddSource notebookId={notebook.id} />
+          </div>
+
+          {/*
+            Einstellungen und Löschen stehen am Fuß der Quellenspalte und
+            nicht im Chat: Es sind Verwaltungsaufgaben, und diese Spalte ist
+            die, in der verwaltet wird. Zugeklappt, weil sie selten gebraucht
+            werden und sonst die Quellen nach oben drängen.
+          */}
+          <details className="mt-6 border-t border-hairline pt-4">
+            <summary className="cursor-pointer text-sm font-bold">Einstellungen</summary>
+
+            <div className="mt-4">
+              <NotebookForm
+                action={update}
+                submitLabel="Speichern"
+                titleLabel="Notebook-Titel"
+                defaults={{
+                  title: notebook.title,
+                  emoji: notebook.emoji,
+                  description: notebook.description
+                }}
+              />
+            </div>
+
+            <div className="mt-6 border-t border-hairline pt-4">
+              <h3 className="text-sm font-bold text-err">Notebook löschen</h3>
+              <p className="mt-1 text-xs text-muted-ink">
+                Entfernt das Notebook und alles darin. Das lässt sich nicht rückgängig machen.
+              </p>
+              <NotebookDelete action={remove} title={notebook.title} />
+            </div>
+          </details>
+
+          <Link
+            href="/app"
+            className="mt-6 rounded-control text-sm text-muted-ink hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            Der bisherige Verlauf konnte nicht geladen werden. Bitte die Seite neu laden.
-          </p>
-        ) : (
-          <ChatPanel
+            ← Alle Notebooks
+          </Link>
+        </>
+      }
+      chat={
+        <>
+          <h2 id="abschnitt-chat" className="sr-only">
+            Chat
+          </h2>
+          <ProviderSwitch
             notebookId={notebook.id}
-            sources={sources.map((s) => ({ id: s.id, title: s.title, status: s.status }))}
-            history={history}
+            current={providerOrDefault(notebook.chat_provider).id}
           />
-        )}
-      </section>
+          <div className="mt-4 flex-1">
+            {messagesError ? (
+              <p
+                role="alert"
+                className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+              >
+                Der bisherige Verlauf konnte nicht geladen werden. Bitte die Seite neu laden.
+              </p>
+            ) : (
+              <ChatPanel
+                notebookId={notebook.id}
+                sources={sources.map((s) => ({ id: s.id, title: s.title, status: s.status }))}
+                history={history}
+              />
+            )}
+          </div>
+        </>
+      }
+      studio={
+        <>
+          {/*
+            Zwei benannte Bereiche in einer Spalte, nicht einer mit zwei
+            Überschriften: „Audio-Überblick" und „Notizen" sind verschiedene
+            Dinge, und wer per Landmarken navigiert, springt sonst mitten in
+            den einen und muss sich zum anderen durchlesen.
+          */}
+          <h2 id="abschnitt-studio" className="mb-3 text-sm font-bold">
+            Audio-Überblick
+          </h2>
+          <AudioOverview
+            notebookId={notebook.id}
+            overview={overview}
+            loadFailed={overviewError !== null}
+            provider={providerOrDefault(notebook.chat_provider).id}
+            hasReadySource={sources.some((s) => s.status === 'ready')}
+          />
 
-      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-studio">
-        <h2 id="abschnitt-studio" className="text-base font-bold">
-          Studio
-        </h2>
-        <AudioOverview
-          notebookId={notebook.id}
-          overview={overview}
-          loadFailed={overviewError !== null}
-          provider={providerOrDefault(notebook.chat_provider).id}
-          hasReadySource={sources.some((s) => s.status === 'ready')}
-        />
-      </section>
-
-      <section className="mt-8 flex flex-col gap-4" aria-labelledby="abschnitt-notizen">
-        <h2 id="abschnitt-notizen" className="text-base font-bold">
-          Notizen
-        </h2>
-        {notesError ? (
-          <p
-            role="alert"
-            className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
-          >
-            Die Notizen konnten nicht geladen werden. Bitte die Seite neu laden.
-          </p>
-        ) : (
-          <NotesPanel notebookId={notebook.id} notes={notes} />
-        )}
-      </section>
-
-      <section
-        className="mt-8 rounded-card border border-hairline bg-surface p-6"
-        aria-labelledby="abschnitt-einstellungen"
-      >
-        <h2 id="abschnitt-einstellungen" className="mb-4 text-base font-bold">
-          Einstellungen
-        </h2>
-        <NotebookForm
-          action={update}
-          submitLabel="Speichern"
-          defaults={{
-            title: notebook.title,
-            emoji: notebook.emoji,
-            description: notebook.description
-          }}
-        />
-      </section>
-
-      <section className="mt-4 rounded-card border border-hairline bg-surface p-6">
-        <h2 className="text-base font-bold text-err">Notebook löschen</h2>
-        <p className="mt-1 text-sm text-muted-ink">
-          Entfernt das Notebook und alles darin. Das lässt sich nicht rückgängig machen.
-        </p>
-
-        <NotebookDelete action={remove} title={notebook.title} />
-      </section>
-    </main>
+          <section className="mt-8" aria-labelledby="abschnitt-notizen">
+            <h2 id="abschnitt-notizen" className="mb-3 text-sm font-bold">
+              Notizen
+            </h2>
+            {notesError ? (
+              <p
+                role="alert"
+                className="rounded-control border border-err/30 bg-err-soft px-4 py-3 text-sm text-err"
+              >
+                Die Notizen konnten nicht geladen werden. Bitte die Seite neu laden.
+              </p>
+            ) : (
+              <NotesPanel notebookId={notebook.id} notes={notes} />
+            )}
+          </section>
+        </>
+      }
+    />
   )
 }

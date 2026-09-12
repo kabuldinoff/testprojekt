@@ -285,3 +285,160 @@
     display: inline;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Der Arbeitsbereich: ein Markup, drei Ausprägungen.
+
+   Die Breiten stammen aus design/canvas.html, Artboard „Desktop ≥ 1280 px":
+   264px links, 300px rechts, der Chat nimmt den Rest. Die Seitenspalten sind
+   fest, weil ihr Inhalt eine natürliche Breite hat — eine Quellenliste wird
+   nicht besser, wenn sie 600px breit ist —, und der Chat wächst, weil
+   Zeilenlänge dort die Lesbarkeit bestimmt.
+
+   Warum hier CSS und kein bedingtes Rendern: Beim Umschalten darf nichts aus
+   dem Baum fliegen, sonst wäre das laufende Gespräch weg. Siehe den Kommentar
+   in src/components/workspace/workspace.tsx.
+
+   Nicht gebaut: verschiebbare Spaltentrenner. Ein zugänglicher Splitter
+   braucht `role="separator"`, `aria-valuenow`, Tastaturbedienung und einen Ort,
+   an dem die Breite überlebt. Das ist an einem Nachmittag nicht ehrlich
+   fertigzustellen, und in einer Vorführung zieht niemand an Spalten.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    /* Die volle Höhe des Bereichs, den das Layout übriglässt. Keine Rechnung
+       mit einer Kopfzeilenhöhe: Die stand als Token daneben und war geraten
+       — 52px statt tatsächlich 61px, und die Seite bekam einen zweiten
+       Scrollbalken. Jetzt vergibt das Layout die Höhe per Flexbox, und diese
+       Zeile nimmt sie entgegen. */
+    height: 100%;
+  }
+
+  /* Diese beiden Regeln stehen **vor** den Media Queries.
+     
+     Bei gleicher Spezifität gewinnt die spätere Regel — dieselbe Falle, die
+     in CLAUDE.md für die Theme-Blöcke beschrieben ist. Stand die Basisregel
+     hinten, war `display: none` aus der Desktop-Abfrage wirkungslos und die
+     Umschaltleiste erschien auf allen Breiten. Ohne Fehlermeldung, nur
+     sichtbar im Bild. */
+  .workspace-kopf {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--hairline);
+    background-color: var(--surface);
+  }
+
+  .workspace-umschalter {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-pill);
+    background-color: var(--canvas);
+  }
+
+  .workspace-spalten {
+    display: flex;
+    flex: 1;
+    min-height: 0; /* sonst wächst der Flex-Container über die Höhe hinaus */
+    overflow: hidden;
+  }
+
+  .workspace-seite,
+  .workspace-mitte {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .workspace-mitte {
+    flex: 1;
+    min-width: 0; /* erlaubt langen Antworten, statt die Spalte zu sprengen */
+  }
+
+  .workspace-seite {
+    background-color: var(--surface);
+    border-right: 1px solid var(--hairline);
+  }
+
+  .workspace-seite--rechts {
+    border-right: 0;
+    border-left: 1px solid var(--hairline);
+  }
+
+  /* Das native Dateifeld in einer 264px-Spalte.
+
+     Browser zeichnen es als „Knopf + Dateiname" und lassen beides nicht
+     umbrechen; in der schmalen Quellenspalte wurde daraus
+     „Choose File No fil...osen". `::file-selector-button` erlaubt, den Knopf
+     zu gestalten, und mit `block` unter dem Text bleibt für den Dateinamen
+     die volle Breite. */
+  .workspace-seite input[type='file'] {
+    font-size: 0.8125rem;
+  }
+
+  .workspace-seite input[type='file']::file-selector-button {
+    margin-right: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-control);
+    background-color: var(--surface-2);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  /* ── Mobil: ein Bereich zur Zeit ──────────────────────────────────────── */
+  @media (width < 48rem) {
+    .workspace-spalten {
+      flex-direction: column;
+    }
+
+    .workspace-seite,
+    .workspace-mitte {
+      border: 0;
+      background-color: transparent;
+    }
+
+    [data-bereich][data-aktiv='false'] {
+      display: none;
+    }
+  }
+
+  /* ── Tablet: Chat immer, daneben höchstens ein Seitenpanel ────────────── */
+  @media (48rem <= width < 80rem) {
+    .workspace-seite {
+      width: 17rem; /* 272px — etwas schmaler als auf Desktop */
+      flex-shrink: 0;
+    }
+
+    /* Der Chat bleibt stehen, die Seiten weichen. */
+    [data-bereich='quellen'][data-aktiv='false'],
+    [data-bereich='studio'][data-aktiv='false'] {
+      display: none;
+    }
+  }
+
+  /* ── Desktop: alle drei, die Umschaltleiste verschwindet ──────────────── */
+  @media (width >= 80rem) {
+    .workspace-umschalter {
+      display: none;
+    }
+
+    .workspace-seite {
+      width: 16.5rem; /* 264px, Canvas */
+      flex-shrink: 0;
+    }
+
+    .workspace-seite--rechts {
+      width: 18.75rem; /* 300px, Canvas */
+    }
+  }
+}
