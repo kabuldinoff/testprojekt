@@ -152,27 +152,61 @@ test('mit dem Notebook verschwinden auch seine Dateien', async ({ page, playwrig
     { timeout: 30_000 }
   )
 
-  // Den Pfad holen, solange es die Zeile noch gibt. Mit dem Secret Key, weil
+  // Und einen Audio-Überblick dazu. Ohne ihn prüfte der Test nur den
+  // `sources`-Bucket — und genau der Audio-Pfad ist der, für den Migration
+  // 0014 die Löschpolicy überhaupt erst nachgeholt hat. Der erste Anlauf
+  // dieses Tests hatte ihn nicht, und die Lücke wäre unbemerkt geblieben.
+  await page
+    .getByRole('region', { name: 'Studio' })
+    .getByRole('button', {
+      name: 'Audio-Überblick erzeugen'
+    })
+    .click()
+  await expect(page.getByRole('region', { name: 'Studio' }).locator('audio')).toBeVisible({
+    timeout: 120_000
+  })
+
+  // Die Pfade holen, solange es die Zeilen noch gibt. Mit dem Secret Key, weil
   // nur er nachher zwischen „gelöscht" und „von einer Policy verborgen"
   // unterscheiden kann — mit dem Token des Nutzers sähe beides gleich aus.
   const api = await playwright.request.newContext()
   const dienst = asService(api)
-  const zeile = await dienst.get(`sources?notebook_id=eq.${notebookId}&select=storage_path`)
-  const pfad = ((await zeile.json()) as Array<{ storage_path: string }>)[0]!.storage_path
-  const ordner = pfad.slice(0, pfad.lastIndexOf('/'))
-  const dateiname = pfad.slice(pfad.lastIndexOf('/') + 1)
 
-  expect(await dienst.storageNames('sources', ordner)).toContain(dateiname)
+  const pfade: Array<{ bucket: string; pfad: string }> = []
+  for (const [bucket, abfrage] of [
+    ['sources', `sources?notebook_id=eq.${notebookId}&select=storage_path`],
+    ['audio', `audio_overviews?notebook_id=eq.${notebookId}&select=storage_path`]
+  ] as const) {
+    const zeilen = (await (await dienst.get(abfrage)).json()) as Array<{
+      storage_path: string | null
+    }>
+    for (const z of zeilen) {
+      expect(z.storage_path, `${bucket}: kein Pfad in der Zeile`).toBeTruthy()
+      pfade.push({ bucket, pfad: z.storage_path! })
+    }
+  }
+  expect(pfade.length, 'es sollten zwei Dateien sein, eine je Bucket').toBe(2)
+
+  const ordnerVon = (p: string) => p.slice(0, p.lastIndexOf('/'))
+  const namenVon = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+  for (const { bucket, pfad } of pfade) {
+    expect(await dienst.storageNames(bucket, ordnerVon(pfad)), `${bucket}: vorher`).toContain(
+      namenVon(pfad)
+    )
+  }
 
   await oeffneEinstellungen(page)
   await page.getByText('Ja, ich möchte löschen').click()
   await page.getByRole('button', { name: /endgültig löschen/ }).click()
   await expect(page).toHaveURL(/\/app$/)
 
-  expect(
-    await dienst.storageNames('sources', ordner),
-    `Datei ${pfad} liegt noch im Bucket`
-  ).not.toContain(dateiname)
+  for (const { bucket, pfad } of pfade) {
+    expect(
+      await dienst.storageNames(bucket, ordnerVon(pfad)),
+      `${pfad} liegt noch im Bucket ${bucket}`
+    ).not.toContain(namenVon(pfad))
+  }
 
   await api.dispose()
 })
