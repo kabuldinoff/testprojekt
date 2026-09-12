@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isProviderId } from '@/lib/llm/registry'
 
 import { firstIssue, parseNotebookForm } from './schema'
+import { removeFiles } from '@/lib/storage/files'
 
 /**
  * Anlegen, Ändern und Löschen von Notebooks.
@@ -97,6 +98,34 @@ export async function deleteNotebook(
   _formData: FormData
 ): Promise<FormState> {
   const { supabase } = await requireUserId()
+
+  // ── Erst die Dateien, dann die Zeile ────────────────────────────────────
+  //
+  // Der Cascade räumt `sources`, `source_chunks` und `audio_overviews` ab —
+  // aber **nicht** den Storage; der hängt nicht am Schema. Ohne diese Zeilen
+  // bleiben die Dateien des Notebooks für immer liegen, unauffindbar, und
+  // zählen weiter gegen das Gigabyte im kostenlosen Tarif.
+  //
+  // Beide Abfragen laufen über den RLS-Client: Ein fremdes Notebook liefert
+  // nichts, und damit wird auch nichts entfernt.
+  const [{ data: quellen }, { data: ueberblick }] = await Promise.all([
+    supabase.from('sources').select('storage_path').eq('notebook_id', notebookId),
+    supabase
+      .from('audio_overviews')
+      .select('storage_path')
+      .eq('notebook_id', notebookId)
+      .maybeSingle<{ storage_path: string | null }>()
+  ])
+
+  const quellenFehler = await removeFiles(
+    supabase,
+    'sources',
+    (quellen ?? []).map((q: { storage_path: string | null }) => q.storage_path)
+  )
+  if (quellenFehler) return { error: quellenFehler }
+
+  const audioFehler = await removeFiles(supabase, 'audio', [ueberblick?.storage_path])
+  if (audioFehler) return { error: audioFehler }
 
   const { error } = await supabase.from('notebooks').delete().eq('id', notebookId)
 

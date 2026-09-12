@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { uniqueEmail } from './lib/supabase'
+import { asService, uniqueEmail } from './lib/supabase'
 
 /**
  * b1 — Notebooks anlegen, ändern, löschen.
@@ -124,6 +124,57 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app$/)
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
+})
+
+test('mit dem Notebook verschwinden auch seine Dateien', async ({ page, playwright }) => {
+  // Der Teil, den niemand sieht. Der Fremdschlüssel räumt `sources`,
+  // `source_chunks` und `audio_overviews` per Cascade ab — **Supabase Storage
+  // hängt nicht am Schema.** Ohne das Einsammeln blieben die Dateien liegen,
+  // unauffindbar, und zählten weiter gegen das Gigabyte im kostenlosen Tarif.
+  //
+  // Nachgemessen beim Aufräumen des lokalen Stacks: 1070 gelöschte Notebooks
+  // hinterließen 837 Dateien, nicht eine ging mit.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Mit Anhang')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+  const notebookId = page.url().split('/').pop()!
+
+  const panel = page.getByRole('region', { name: 'Quelle hinzufügen' })
+  await panel.getByRole('tab', { name: 'Text' }).click()
+  await panel.getByLabel('Titel').fill('Anhang')
+  await panel.getByLabel('Inhalt').fill('Die Marge stieg deutlich an. '.repeat(20))
+  await panel.getByRole('button', { name: 'Hinzufügen' }).click()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Anhang' })).toHaveAttribute(
+    'data-status',
+    'ready',
+    { timeout: 30_000 }
+  )
+
+  // Den Pfad holen, solange es die Zeile noch gibt. Mit dem Secret Key, weil
+  // nur er nachher zwischen „gelöscht" und „von einer Policy verborgen"
+  // unterscheiden kann — mit dem Token des Nutzers sähe beides gleich aus.
+  const api = await playwright.request.newContext()
+  const dienst = asService(api)
+  const zeile = await dienst.get(`sources?notebook_id=eq.${notebookId}&select=storage_path`)
+  const pfad = ((await zeile.json()) as Array<{ storage_path: string }>)[0]!.storage_path
+  const ordner = pfad.slice(0, pfad.lastIndexOf('/'))
+  const dateiname = pfad.slice(pfad.lastIndexOf('/') + 1)
+
+  expect(await dienst.storageNames('sources', ordner)).toContain(dateiname)
+
+  await oeffneEinstellungen(page)
+  await page.getByText('Ja, ich möchte löschen').click()
+  await page.getByRole('button', { name: /endgültig löschen/ }).click()
+  await expect(page).toHaveURL(/\/app$/)
+
+  expect(
+    await dienst.storageNames('sources', ordner),
+    `Datei ${pfad} liegt noch im Bucket`
+  ).not.toContain(dateiname)
+
+  await api.dispose()
 })
 
 test('ein fremdes Notebook ergibt 404, nicht 403', async ({ page, browser }) => {

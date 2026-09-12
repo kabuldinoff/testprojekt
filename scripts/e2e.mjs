@@ -26,6 +26,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 
 import { localStackEnv } from './lib/local-stack.mjs'
+import { raeumeTestkonten } from './lib/testkonten.mjs'
 
 /**
  * Fester Port, weil er in drei Prozesse muss: Stub, Build und Server. Er
@@ -155,6 +156,7 @@ function beenden(code) {
 
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => beenden(1))
 
+let ausgang = 0
 for (const [label, args] of [
   ['Build', ['exec', 'next', 'build']],
   ['Playwright', ['exec', 'playwright', ...process.argv.slice(2)]]
@@ -162,8 +164,20 @@ for (const [label, args] of [
   const result = spawnSync('pnpm', args, { stdio: 'inherit', env })
   if (result.status !== 0) {
     console.error(`\n${label} fehlgeschlagen.`)
-    beenden(result.status ?? 1)
+    ausgang = result.status ?? 1
+    break
   }
 }
 
-beenden(0)
+// Aufräumen **auch nach einem roten Lauf**, und deshalb nicht in `beenden()`:
+// Ein Fehlschlag hinterlässt genauso viele Konten wie ein Erfolg, und gerade
+// dann läuft die Suite gleich noch einmal.
+//
+// Die Artefakte des gescheiterten Laufs gehen dabei nicht verloren — Traces und
+// Bildschirmfotos liegen in `test-results/`, nicht in der Datenbank.
+await raeumeTestkonten({
+  apiUrl: env.NEXT_PUBLIC_SUPABASE_URL,
+  secretKey: env.SUPABASE_SECRET_KEY
+})
+
+beenden(ausgang)

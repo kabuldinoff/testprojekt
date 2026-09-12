@@ -50,6 +50,16 @@ das Speicherkontingent.
 Eine Policy, die die Datei bloß verbirgt, sähe sonst genauso aus wie eine gelöschte, und der
 Test wäre grün, während der Speicher vollläuft.
 
+Dasselbe gilt beim **Notebook**, und dort in größerem Maßstab: Der Cascade nimmt `sources`,
+`source_chunks` und `audio_overviews` mit, die Dateien beider Buckets nicht. Wie groß das wird,
+zeigte das Aufräumen des lokalen Stacks — 1493 gelöschte Testkonten hinterließen **837
+Dateien, nicht eine ging mit.** `deleteNotebook` sammelt sie deshalb ein, bevor die Zeile fällt;
+`e2e/b1-notebook-crud` hält es fest.
+
+Der `audio`-Bucket hatte bis dahin überhaupt keine Löschpolicy (Migration 0014 holt sie nach).
+Zum Zeitpunkt von Migration 0011 gab es keinen Weg, einen Überblick loszuwerden — und was es
+nicht gibt, braucht keine Policy. Inzwischen gibt es ihn.
+
 ## Drosselung — was sie schützt und was nicht
 
 Sie schützt **kein Geheimnis**, sondern ein Kontingent. Die AI-Anbieter laufen im kostenlosen

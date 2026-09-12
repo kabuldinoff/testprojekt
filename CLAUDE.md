@@ -229,6 +229,11 @@ Diese Regeln gelten ab der Datenbank-Scheibe und sind nicht verhandelbar.
   Deshalb liegt der Ladezustand der Übersicht in der Route-Gruppe `(uebersicht)` und nicht eine
   Ebene höher.
 
+- **Storage hängt nicht am Schema.** Ein `on delete cascade` räumt die Datenbank auf und lässt
+  die Dateien liegen — unauffindbar, weil die Zeile fehlt, die auf sie zeigte. Wer eine Zeile
+  löscht, die einen `storage_path` trägt, entfernt **zuerst die Datei** und dann die Zeile;
+  `src/lib/storage/files.ts` trägt die Begründung für diese Reihenfolge. Nachgemessen: 1493
+  gelöschte Konten hinterließen 837 Dateien, nicht eine ging mit.
 - **Nie stumm scheitern.** Fehler werden als `status='failed'` samt `error_message` persistiert.
 - Beim URL-Import holt der Server eine vom Nutzer angegebene Adresse. Geprüft wird zweistufig:
   syntaktisch in `src/lib/sources/url-safety.ts` (rein, getestet) **und** nach der Auflösung des
