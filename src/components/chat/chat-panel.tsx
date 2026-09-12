@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 import { Answer } from '@/components/chat/answer'
 import { SaveAsNote } from '@/components/notes/save-as-note'
 import { Button } from '@/components/ui/button'
+import { PfeilHoch } from '@/components/ui/icons'
 import { rewriteMarkers } from '@/lib/chat/citations'
 import {
   sourcesOf,
@@ -186,8 +187,24 @@ export function ChatPanel({
             placeholder="Was möchten Sie wissen?"
             className="min-h-16 flex-1 resize-y rounded-control border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           />
-          <Button type="submit" disabled={laeuft || frage.trim().length === 0}>
-            {laeuft ? 'Antwortet …' : 'Fragen'}
+          {/*
+            Ein Symbolknopf, und damit einer ohne Text — sein zugänglicher Name
+            steht deshalb im `aria-label` und wechselt mit dem Zustand: Wer
+            nicht sieht, dass der Pfeil ausgegraut ist, hört „Antwortet …" und
+            weiß, warum nichts passiert.
+
+            Der Name bleibt im Ruhezustand wörtlich „Fragen". Das ist kein
+            Zufall: Vier End-to-End-Tests greifen den Knopf über genau diesen
+            Namen, und ein Symbol, das seinen Namen verliert, wäre für einen
+            Screenreader dasselbe wie für den Test — nicht auffindbar.
+          */}
+          <Button
+            type="submit"
+            size="icon"
+            aria-label={laeuft ? 'Antwortet …' : 'Fragen'}
+            disabled={laeuft || frage.trim().length === 0}
+          >
+            <PfeilHoch />
           </Button>
         </form>
       ) : (

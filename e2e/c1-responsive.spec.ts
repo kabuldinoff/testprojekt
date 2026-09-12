@@ -25,6 +25,7 @@ const quellen = (page: Page) => page.getByRole('region', { name: 'Quellen' })
 const chat = (page: Page) => page.getByRole('region', { name: 'Chat' })
 const studio = (page: Page) => page.getByRole('region', { name: 'Studio' })
 const umschalter = (page: Page) => page.getByRole('group', { name: 'Bereich auswählen' })
+const klapper = (page: Page) => page.getByRole('group', { name: 'Spalten einklappen' })
 
 async function notebookMitQuelle(page: Page) {
   await page.goto('/registrieren')
@@ -83,6 +84,46 @@ test('auf Desktop stehen alle drei Bereiche nebeneinander', async ({ page }) => 
   const s = (await studio(page).boundingBox())!
   expect(q.x + q.width).toBeLessThanOrEqual(c.x + 1)
   expect(c.x + c.width).toBeLessThanOrEqual(s.x + 1)
+})
+
+test('auf Desktop lassen sich die Seitenspalten einklappen', async ({ page }) => {
+  await page.setViewportSize(DESKTOP)
+  await notebookMitQuelle(page)
+
+  const vorher = (await chat(page).boundingBox())!.width
+
+  await klapper(page).getByRole('button', { name: 'Quellenspalte einklappen' }).click()
+  await expect(quellen(page)).toBeHidden()
+  await expect(chat(page)).toBeVisible()
+
+  await klapper(page).getByRole('button', { name: 'Studiospalte einklappen' }).click()
+  await expect(studio(page)).toBeHidden()
+
+  // Der Punkt der Übung: Der frei gewordene Platz geht an den Chat. Ohne
+  // diese Zusicherung wäre „eingeklappt" auch dann erfüllt, wenn die Spalte
+  // bloß unsichtbar würde und ihre Breite als Lücke stehen bliebe.
+  expect((await chat(page).boundingBox())!.width).toBeGreaterThan(vorher)
+
+  // Und zurück. Ein Knopf, der nur in eine Richtung funktioniert, ist eine
+  // Sackgasse — sein Name sagt nach dem Klick „ausklappen", und das muss
+  // stimmen.
+  await klapper(page).getByRole('button', { name: 'Quellenspalte ausklappen' }).click()
+  await klapper(page).getByRole('button', { name: 'Studiospalte ausklappen' }).click()
+  await expect(quellen(page)).toBeVisible()
+  await expect(studio(page)).toBeVisible()
+  expect((await chat(page).boundingBox())!.width).toBe(vorher)
+})
+
+test('unterhalb von 1280px gibt es die Klappknöpfe nicht', async ({ page }) => {
+  // Zwei Bedienelemente für dieselbe Frage wären ein Widerspruch: Die
+  // Umschaltleiste bestimmt dort, welcher Bereich sichtbar ist. Ein
+  // eingeklappter Zustand, der einen von der Leiste als aktiv angezeigten
+  // Bereich versteckt, wäre ein Zustand ohne Ausweg.
+  await page.setViewportSize(TABLET)
+  await notebookMitQuelle(page)
+
+  await expect(klapper(page)).toBeHidden()
+  await expect(umschalter(page)).toBeVisible()
 })
 
 test('auf Tablet bleibt der Chat stehen, die Seiten wechseln sich ab', async ({ page }) => {

@@ -126,9 +126,23 @@ const PAIRS: Array<{ where: string; foreground: string; background: string; thre
 
   // Gold — das Akzentpaar, das am ehesten kippt.
   {
-    where: 'Goldtext auf Goldfläche',
+    where: 'Goldtext auf blasser Goldfläche',
     foreground: '--accent-ink',
     background: '--accent-soft',
+    threshold: AA_NORMAL
+  },
+  // Die Lücke, durch die ein Fehler bis in die Oberfläche gekommen ist.
+  //
+  // Der aktive Zitat-Chip stand auf `bg-accent text-accent-ink`. Im Hellen
+  // ist --accent-ink dunkel und alles sah richtig aus; im Dunkeln ist es
+  // derselbe Goldton wie die Fläche darunter — 1.00:1, die Nummer schlicht
+  // weg. Geprüft wurde damals nur --accent-ink auf --accent-soft, also die
+  // Paarung daneben. Ein Test, der die falsche Hälfte einer Farbfamilie
+  // prüft, ist grün und wertlos zugleich.
+  {
+    where: 'Tinte auf voller Goldfläche',
+    foreground: '--on-accent',
+    background: '--accent',
     threshold: AA_NORMAL
   },
 

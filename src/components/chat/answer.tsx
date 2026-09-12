@@ -115,9 +115,13 @@ function CitationChip({
         // Element sowohl auf einer Karte als auch mitten im Fließtext und
         // braucht deshalb eigene Werte statt brand-*.
         //
-        // Aktiv Gold — Stelle 1 von 3 der Gold-Disziplin aus CLAUDE.md.
+        // Aktiv Gold — Stelle 1 von 4 der Gold-Disziplin aus CLAUDE.md.
+        //
+        // `text-on-accent`, nicht `text-accent-ink`: Letzteres ist die Schrift
+        // auf --accent-soft, der blassen Tönung. Auf der vollen Fläche war es
+        // im dunklen Theme derselbe Goldton und die Nummer unsichtbar.
         active
-          ? 'bg-accent text-accent-ink'
+          ? 'bg-accent text-on-accent'
           : 'border border-cite-border bg-cite-bg text-cite-fg hover:border-cite-fg'
       ].join(' ')}
     >
