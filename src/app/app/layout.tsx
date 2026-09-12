@@ -50,9 +50,22 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!user) redirect('/anmelden')
 
+  // Feste Höhe statt Mindesthöhe, und der Inhalt bekommt den Rest.
+  //
+  // Der Arbeitsbereich braucht eine **definierte** Höhe, damit seine drei
+  // Spalten jeweils für sich scrollen statt die ganze Seite. Der erste Anlauf
+  // rechnete sie aus dem Viewport minus einer Kopfzeilenhöhe, die als Token
+  // danebenstand — und die Zahl war geraten: 52px im Token, 61px in
+  // Wirklichkeit. Die Folge war ein zweiter Scrollbalken auf jeder Breite.
+  //
+  // Eine nachgemessene Zahl wäre genauso zerbrechlich gewesen; sie hätte nur
+  // bis zur nächsten Änderung an der Kopfzeile gehalten. Hier rechnet
+  // stattdessen CSS: Die Kopfzeile schrumpft nicht, der Inhalt nimmt den Rest.
+  // `min-h-0` ist dabei nicht optional — ohne das wächst ein Flex-Kind über
+  // seinen Anteil hinaus, sobald sein Inhalt größer ist.
   return (
-    <div className="min-h-dvh bg-canvas">
-      <header className="flex items-center gap-4 border-b border-hairline bg-surface px-5 py-3">
+    <div className="flex h-dvh flex-col bg-canvas">
+      <header className="flex shrink-0 items-center gap-4 border-b border-hairline bg-surface px-5 py-3">
         <Wordmark href="/app" />
         <span className="flex-1" />
         <span className="hidden text-sm text-muted-ink sm:inline">{user.email}</span>
@@ -63,7 +76,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </Button>
         </form>
       </header>
-      {children}
+      <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
     </div>
   )
 }

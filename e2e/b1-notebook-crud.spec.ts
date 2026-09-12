@@ -21,6 +21,23 @@ async function registerAndSignIn(page: Page) {
   await expect(page).toHaveURL(/\/app$/)
 }
 
+/**
+ * Öffnet die Einstellungen im Arbeitsbereich.
+ *
+ * Sie liegen am Fuß der Quellenspalte hinter einer Aufklappung — sie werden
+ * selten gebraucht und drängten die Quellen sonst nach unten. Für die Tests
+ * heißt das: erst öffnen, dann tippen.
+ */
+async function oeffneEinstellungen(page: Page) {
+  // Auf die Quellenspalte warten, nicht auf die Umschaltleiste: Die ist ab
+  // 1280px zu Recht unsichtbar, und `waitFor()` darauf lief in eine
+  // Zeitüberschreitung — auf genau der Breite, mit der die Tests laufen.
+  await page.getByRole('region', { name: 'Quellen' }).waitFor()
+  const zusammenfassung = page.getByText('Einstellungen', { exact: true })
+  await zusammenfassung.click()
+  await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible()
+}
+
 test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
   await registerAndSignIn(page)
 
@@ -45,9 +62,11 @@ test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleDescription(
     'Umsatz, Marge, Ausblick'
   )
+
+  await oeffneEinstellungen(page)
   await expect(page.getByLabel(/Beschreibung/)).toHaveValue('Umsatz, Marge, Ausblick')
 
-  await page.getByRole('link', { name: /Zurück zur Übersicht/ }).click()
+  await page.getByRole('link', { name: /Alle Notebooks/ }).click()
   await expect(page.getByRole('link', { name: /Quartalsanalyse Q3/ })).toBeVisible()
 })
 
@@ -71,7 +90,8 @@ test('Umbenennen wirkt sofort in Titel und Übersicht', async ({ page }) => {
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
   await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
 
-  await page.getByLabel('Titel').fill('Zweiter Name')
+  await oeffneEinstellungen(page)
+  await page.getByLabel('Notebook-Titel').fill('Zweiter Name')
   await page.getByRole('button', { name: 'Speichern' }).click()
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Zweiter Name')
@@ -90,8 +110,11 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
   await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
 
-  // Der gefährliche Knopf liegt hinter einer Aufklappung und ist vorher nicht
-  // erreichbar. Ohne diese Zusicherung wäre die Bestätigung nur Dekoration.
+  await oeffneEinstellungen(page)
+
+  // Der gefährliche Knopf liegt hinter einer weiteren Aufklappung und ist
+  // vorher nicht erreichbar. Ohne diese Zusicherung wäre die Bestätigung nur
+  // Dekoration.
   const deleteButton = page.getByRole('button', { name: /endgültig löschen/ })
   await expect(deleteButton).toBeHidden()
 
