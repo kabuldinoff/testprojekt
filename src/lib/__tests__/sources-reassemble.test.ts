@@ -72,8 +72,15 @@ describe('assembleSource · gegen den echten Zerleger', () => {
     // falsch berechnete Überlappung auffallen: zu wenig abgezogen heißt
     // doppelter Text, zu viel heißt fehlender.
     const text = prose(12_000)
-    const [seite] = assembleSource(alsZeilen([page(text)]))
-    expect(kern(seite!.text)).toBe(kern(text))
+    const zeilen = alsZeilen([page(text)])
+
+    // Ohne diese Zeile prüfte der Test unter Umständen gar nichts: Bei einem
+    // einzigen Abschnitt gibt es keine Überlappung, und die Zusicherung wäre
+    // trivial erfüllt. Genau so ist der End-to-End-Test dieser Scheibe einmal
+    // grün geblieben, während das Abziehen der Überlappung ausgebaut war.
+    expect(zeilen.length, 'die Vorlage ergibt nur einen Abschnitt').toBeGreaterThan(5)
+
+    expect(kern(assembleSource(zeilen)[0]!.text)).toBe(kern(text))
   })
 
   it('hält auch Text ohne jede Satzgrenze zusammen', () => {
@@ -92,6 +99,54 @@ describe('assembleSource · gegen den echten Zerleger', () => {
     const text = Array.from({ length: 8 }, (_, i) => kopf + prose(900, `Segment${i}`)).join('\n\n')
     const [seite] = assembleSource(alsZeilen([page(text)]))
     expect(kern(seite!.text)).toBe(kern(text))
+  })
+
+  it('verliert nichts an einer langen Leerraumstrecke', () => {
+    // Der Befund aus dem Review, nachgestellt. Ein Satzende, dann 120
+    // Leerzeichen — Tabellenlayout aus einem PDF sieht so aus. Liegt das im
+    // Überlappungsfenster, betrug der abgeschnittene Leerraum 121 Zeichen.
+    //
+    // Vorher: Das Suchfenster von acht Zeichen greift nicht, der Rückfall zog
+    // die volle erwartete Länge ab und **löschte hundert Zeichen** echten
+    // Text. Lautlos — die Anzeige sah vollständig aus.
+    const satz = 'Der Umsatz im Segment stieg deutlich an. '
+    const text = satz.repeat(25) + ' '.repeat(120) + satz.repeat(60)
+
+    const zeilen = alsZeilen([page(text)])
+    expect(zeilen.length, 'ohne mehrere Abschnitte prüft der Test nichts').toBeGreaterThan(1)
+    expect(kern(assembleSource(zeilen)[0]!.text)).toBe(kern(text))
+  })
+
+  it('verträgt Altbestand mit ungetrimmten Positionen — lieber doppelt als weg', () => {
+    // Abschnitte, die vor `alsChunk` geschrieben wurden, tragen Positionen des
+    // **Rohbereichs**. In Produktion liegen solche Zeilen; sie werden erst bei
+    // einer Neuverarbeitung berichtigt.
+    //
+    // Die Zusicherung ist deshalb schwächer und trotzdem die richtige: Es darf
+    // Text doppelt stehen, aber keiner fehlen. Doppelten sieht man, fehlenden
+    // nicht.
+    const satz = 'Der Umsatz im Segment stieg deutlich an. '
+    const text = satz.repeat(25) + ' '.repeat(120) + satz.repeat(60)
+
+    const alt = chunkDocument([page(text)]).map((c) => ({
+      chunkIndex: c.index,
+      pageNumber: c.pageNumber,
+      content: c.content,
+      // Rückwärts auf die alte, ungetrimmte Fassung: nach vorn bis zum
+      // vorigen Ende, nach hinten bis zum nächsten sichtbaren Zeichen.
+      charStart:
+        c.charStart -
+        (text.slice(0, c.charStart).length - text.slice(0, c.charStart).trimEnd().length),
+      charEnd: c.charEnd + (text.slice(c.charEnd).length - text.slice(c.charEnd).trimStart().length)
+    }))
+
+    const zusammen = assembleSource(alt)[0]!.text
+    for (const stueck of [satz.repeat(3), 'Der Umsatz im Segment stieg deutlich an.']) {
+      expect(kern(zusammen)).toContain(kern(stueck))
+    }
+    expect(kern(zusammen).length, 'Text ist verlorengegangen').toBeGreaterThanOrEqual(
+      kern(text).length
+    )
   })
 
   it('kommt mit Absätzen zurecht, zwischen denen nicht überlappt wird', () => {

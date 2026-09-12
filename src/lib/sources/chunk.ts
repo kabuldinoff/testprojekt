@@ -117,6 +117,46 @@ function findWordEnd(text: string, from: number, notBefore: number): number {
 }
 
 /**
+ * Macht aus einem Rohbereich einen Abschnitt — und rückt die Positionen auf
+ * den **getrimmten** Inhalt.
+ *
+ * Das ist der Punkt der Funktion. `content` war immer die getrimmte Fassung,
+ * `charStart`/`charEnd` zeigten aber auf den Rohbereich. Die Differenz ist der
+ * abgeschnittene Leerraum, und sie ist aus den gespeicherten Daten nicht mehr
+ * herleitbar: Wer später aus den Abschnitten wieder einen Text bauen will,
+ * kann die Überlappung nur schätzen.
+ *
+ * Nachgemessen, was das kostet: Steht im Überlappungsfenster ein Satzende
+ * direkt vor zwölf Leerzeichen, schätzt `reassemble.ts` um dreizehn Zeichen
+ * daneben und verliert zehn Zeichen echten Text — lautlos. Bei hundertzwanzig
+ * Leerzeichen sind es hundert. Tabellenlayout aus einem PDF sieht genau so aus.
+ *
+ * Mit dieser Zuordnung gilt `text.slice(charStart, charEnd) === content`
+ * **exakt**, ohne `trim()`. Aus einer Schätzung wird eine Subtraktion.
+ */
+function alsChunk(
+  text: string,
+  von: number,
+  bis: number,
+  index: number,
+  pageNumber: number | null
+): Chunk {
+  const roh = text.slice(von, bis)
+  const content = roh.trim()
+
+  // Ein Bereich aus reinem Leerraum hat keine sinnvolle Position. Ohne diesen
+  // Zweig überholte `charStart` das `charEnd`, weil beide Trimmwerte die volle
+  // Länge betragen.
+  if (content.length === 0) {
+    return { index, content, pageNumber, charStart: von, charEnd: von }
+  }
+
+  const vorn = roh.length - roh.trimStart().length
+  const hinten = roh.length - roh.trimEnd().length
+  return { index, content, pageNumber, charStart: von + vorn, charEnd: bis - hinten }
+}
+
+/**
  * Zerlegt eine einzelne Seite.
  *
  * Getrennt wird an Absatzgrenzen, wo sie günstig liegen, sonst an Satzenden,
@@ -134,13 +174,7 @@ function chunkPage(page: Page, startIndex: number): Chunk[] {
     const rest = text.length - cursor
 
     if (rest <= MAX_CHARS) {
-      chunks.push({
-        index: index++,
-        content: text.slice(cursor).trim(),
-        pageNumber: page.number,
-        charStart: cursor,
-        charEnd: text.length
-      })
+      chunks.push(alsChunk(text, cursor, text.length, index++, page.number))
       break
     }
 
@@ -160,15 +194,10 @@ function chunkPage(page: Page, startIndex: number): Chunk[] {
     // liefe die Schleife endlos.
     if (end <= cursor) end = Math.min(limit, text.length)
 
-    const content = text.slice(cursor, end).trim()
-    if (content.length > 0) {
-      chunks.push({
-        index: index++,
-        content,
-        pageNumber: page.number,
-        charStart: cursor,
-        charEnd: end
-      })
+    const abschnitt = alsChunk(text, cursor, end, index, page.number)
+    if (abschnitt.content.length > 0) {
+      chunks.push(abschnitt)
+      index++
     }
 
     // Der nächste Abschnitt beginnt vor dem Ende des vorigen — an der ersten

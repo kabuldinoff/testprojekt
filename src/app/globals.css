@@ -37,6 +37,12 @@
      vergleicht beide. */
   --mark-radius: 7px;
 
+  /* Die Ecke der Zitat-Markierung im Quellenbetrachter. Bewusst **nicht**
+     --mark-radius: Die Plakette ist 28px hoch, eine Textzeile knapp 20 — 7px
+     ergäben dort eine Pille um einen halben Satz. Drei Pixel nehmen der Fläche
+     die Härte, ohne sie zu einer Form zu machen. */
+  --highlight-radius: 3px;
+
   /* Die Größe, bei der das „N" die Plakette füllt, ohne an den Rand zu
      stoßen. Fett gesetzt liegt sie damit unter der Schwelle für „großen
      Text" (18.66px) — der Kontrast wird deshalb gegen die strenge Schwelle
@@ -118,6 +124,13 @@
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-pop: 0 8px 16px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.45);
 
+  /* Der Hintergrund hinter einem modalen Dialog.
+
+     Im Dunkeln kräftiger als im Hellen, aus demselben Grund wie bei den
+     Schatten: Auf dunklem Grund trägt eine Abdunklung weniger, weil weniger
+     Kontrast zwischen Fläche und Schleier bleibt. */
+  --backdrop: rgb(0 0 0 / 0.6);
+
   /* Das Markenzeichen: das „N" als Plakette, wie das Symbol im Browser-Tab.
      Die Fläche ist in beiden Ausprägungen dieselbe dunkle Farbe — so sieht
      das Zeichen überall gleich aus, egal auf welchem Grund es sitzt. Nur der
@@ -184,6 +197,8 @@
   --shadow-card: 0 1px 2px rgb(14 20 36 / 0.04), 0 8px 24px rgb(14 20 36 / 0.06);
   --shadow-pop: 0 8px 16px rgb(14 20 36 / 0.08), 0 24px 48px rgb(14 20 36 / 0.1);
 
+  --backdrop: rgb(14 20 36 / 0.45);
+
   /* Fläche bleibt dunkel; der Buchstabe ist hier das Blau aus dem Tab-Symbol
      (#5B8DEF), nicht das hellere brand-600 dieser Ausprägung — auf dunklem
      Grund braucht es den helleren Ton. */
@@ -202,6 +217,7 @@
   --color-accent-ink: var(--accent-ink);
   --color-on-brand: var(--on-brand);
   --color-on-accent: var(--on-accent);
+  --color-backdrop: var(--backdrop);
 
   --color-ink: var(--ink);
   --color-muted-ink: var(--muted-ink);
@@ -229,6 +245,7 @@
   --color-mark-bg: var(--mark-bg);
   --color-mark-ink: var(--mark-ink);
   --radius-mark: var(--mark-radius);
+  --radius-highlight: var(--highlight-radius);
   --text-mark: var(--mark-text-size);
   --text-mark-word: var(--mark-word-size);
 

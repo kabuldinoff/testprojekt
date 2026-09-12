@@ -23,7 +23,15 @@ const STRICH = {
   strokeLinejoin: 'round'
 } as const
 
-/** Zeigt in die Richtung, in die sich die Spalte bewegt. */
+/**
+ * `richtung` ist die Richtung, in die sich die **Spalte** bewegt — nicht die
+ * Seite, auf der der Knopf sitzt.
+ *
+ * Der Unterschied ist der ganze Zweck der Prop: Der naheliegende Fehler ist,
+ * den Pfeil nach der Position des Knopfes zu setzen. Dann zeigt er beim
+ * Einklappen und beim Ausklappen gleich, und der Nutzer erfährt aus dem Zeichen
+ * nichts über das, was passieren wird.
+ */
 export function Chevron({ richtung }: { richtung: 'links' | 'rechts' }) {
   return (
     <svg viewBox="0 0 20 20" className="size-4" aria-hidden="true" {...STRICH}>
@@ -32,7 +40,14 @@ export function Chevron({ richtung }: { richtung: 'links' | 'rechts' }) {
   )
 }
 
-/** Der Absendepfeil im Chat. */
+/**
+ * Nach oben und nicht nach rechts.
+ *
+ * Rechts hieße „weiter" — der nächste Schritt in einer Abfolge. Nach oben
+ * heißt „hinauf in den Verlauf", und genau dorthin geht die Frage: Sie
+ * erscheint über dem Eingabefeld. Das Zeichen beschreibt damit die Bewegung,
+ * die der Nutzer gleich sieht.
+ */
 export function PfeilHoch() {
   return (
     <svg viewBox="0 0 20 20" className="size-5" aria-hidden="true" {...STRICH}>

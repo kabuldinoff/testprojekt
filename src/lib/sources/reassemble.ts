@@ -46,12 +46,21 @@
  */
 
 /**
- * Wie viele Zeichen das Trimmen höchstens genommen haben kann.
+ * Wie weit unterhalb des erwarteten Werts noch gesucht wird.
  *
- * `chunk.ts` setzt Abschnittsgrenzen an Satz- und Absatzenden; abgeschnitten
- * wird dort der Leerraum dazwischen — ein Leerzeichen, ein Zeilenumbruch, bei
- * einem Absatz zwei. Acht ist großzügig und trotzdem eng genug, dass in dem
- * Fenster kein zweiter, falscher Treffer liegen kann.
+ * Für Abschnitte, die `chunk.ts` heute schreibt, ist das **null Arbeit**:
+ * `charStart`/`charEnd` folgen seit `alsChunk` dem getrimmten Inhalt, die
+ * erwartete Länge stimmt also exakt und der erste Versuch trifft.
+ *
+ * Das Fenster ist für **Altbestand** da. Vor dieser Änderung zeigten die
+ * Positionen auf den Rohbereich, und die Differenz — der abgeschnittene
+ * Leerraum — steckt in keiner gespeicherten Spalte. Bei Satz- und
+ * Absatzgrenzen sind das ein bis zwei Zeichen; acht deckt das ab und ist eng
+ * genug, dass in dem Fenster kein zweiter, falscher Treffer liegen kann.
+ *
+ * Breiter zu suchen wäre keine Verbesserung, sondern der Rückfall in den
+ * ersten Entwurf: Bei wiederkehrendem Text passt jedes Ende auf jeden Anfang,
+ * und ein zu langer Treffer verschluckt einen halben Absatz.
  */
 const TRIM_SPIELRAUM = 8
 
@@ -118,10 +127,19 @@ export function overlapLength(vorheriger: string, naechster: string, erwartet: n
     if (vorheriger.endsWith(naechster.slice(0, k))) return k
   }
 
-  // Kein Treffer im Fenster. Das sollte nicht vorkommen; wenn doch, ist die
-  // gespeicherte Länge die bessere Schätzung als gar keine — ein paar Zeichen
-  // doppelt sind lesbar, ein verschlucktes Wort nicht.
-  return oben
+  // Kein Treffer im Fenster — also **nichts** abziehen.
+  //
+  // Der erste Entwurf gab hier `oben` zurück, die erwartete Länge. Das war ein
+  // stiller Datenverlust, und das Review hat ihn gefunden: Steht im
+  // Überlappungsfenster ein Satzende direkt vor zwölf Leerzeichen, beträgt der
+  // abgeschnittene Leerraum dreizehn Zeichen, das Fenster greift nicht — und
+  // `slice(oben)` schnitt zehn Zeichen weg, die nur einmal vorkamen. Bei
+  // hundertzwanzig Leerzeichen waren es hundert. Nachgemessen, bevor
+  // geändert wurde.
+  //
+  // `0` ist der sichere Ausgang: Die Überlappung steht dann doppelt da. Das
+  // sieht man, und es ist lesbar. Fehlender Text sieht man nicht.
+  return 0
 }
 
 /**
@@ -158,6 +176,9 @@ export function assembleSource(chunks: ChunkRow[]): AssembledPage[] {
         continue
       }
 
+      // In **Originalkoordinaten** gerechnet und nicht über die Länge des
+      // bisherigen Textes: Der ist die Aneinanderreihung getrimmter Inhalte,
+      // seine Länge entspricht keiner Position im Quelltext.
       const k = overlapLength(text, c.content, bisherBis - c.charStart)
       // Bei Überlappung beginnt der Abschnitt dort, wo sie anfängt — also ein
       // Stück **vor** dem bisherigen Ende. Ohne Überlappung hinter dem

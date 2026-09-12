@@ -28,6 +28,17 @@ import type { AssembledPage } from '@/lib/sources/reassemble'
  * erste, und das ist in der Hälfte der Fälle die falsche.
  */
 
+/**
+ * Die Zeilenbreiten des Ladeskeletts, in Prozent.
+ *
+ * Keine gleichmäßigen Balken: Fließtext füllt die Zeile fast ganz und bricht
+ * am Absatzende kurz ab. Ein Block aus acht gleich langen Balken liest sich als
+ * Tabelle, und wenn der echte Text kommt, springt das Layout — der Sprung
+ * zählt als CLS. Die beiden kurzen Werte sitzen deshalb dort, wo im Quelltext
+ * Absätze enden.
+ */
+const SKELETT_ZEILEN = [100, 96, 99, 72, 100, 93, 98, 60]
+
 interface QuellText {
   title: string
   kind: string
@@ -49,6 +60,11 @@ export function SourceViewer({
   const markeRef = useRef<HTMLElement>(null)
   const [daten, setDaten] = useState<QuellText | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
+
+  // Zählt hoch, wenn jemand „Erneut versuchen" drückt, und stößt damit den
+  // Abruf-Effekt noch einmal an. Ein eigener `lade()`-Aufruf daneben wäre ein
+  // zweiter Weg zu denselben Daten — und der eine, der den Zustand vergisst.
+  const [versuch, setVersuch] = useState(0)
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -84,7 +100,7 @@ export function SourceViewer({
     return () => {
       ignorieren = true
     }
-  }, [sourceId])
+  }, [sourceId, versuch])
 
   // Erst wenn der Text steht, kann die Markierung in den sichtbaren Bereich
   // gerollt werden — vorher gibt es sie nicht.
@@ -111,7 +127,7 @@ export function SourceViewer({
         if (event.target === dialogRef.current) dialogRef.current?.close()
       }}
       aria-labelledby="quelltext-titel"
-      className="m-auto w-[min(44rem,92vw)] rounded-card border border-hairline bg-surface p-0 text-ink shadow-pop backdrop:bg-[rgb(0_0_0/0.55)]"
+      className="m-auto w-[min(44rem,92vw)] rounded-card border border-hairline bg-surface p-0 text-ink shadow-pop backdrop:bg-backdrop"
     >
       <div className="flex items-start justify-between gap-3 border-b border-hairline px-5 py-4">
         <div className="min-w-0">
@@ -138,9 +154,25 @@ export function SourceViewer({
 
       <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
         {fehler ? (
-          <p role="alert" className="rounded-control bg-err-soft px-4 py-3 text-sm text-err">
-            {fehler}
-          </p>
+          /* Der Grund **und** genau eine Handlung — CLAUDE.md verbietet die
+             Sackgasse. Der Abruf läuft nur beim Öffnen; ohne diesen Knopf
+             müsste der Nutzer erraten, dass Schließen und erneutes Öffnen
+             hilft. */
+          <div role="alert" className="rounded-control bg-err-soft px-4 py-3">
+            <p className="text-sm text-err">{fehler}</p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="compact"
+              className="mt-3"
+              onClick={() => {
+                setFehler(null)
+                setVersuch((n) => n + 1)
+              }}
+            >
+              Erneut versuchen
+            </Button>
+          </div>
         ) : !daten ? (
           // Skelett in den Maßen des echten Inhalts — sonst springt das
           // Layout, sobald der Text da ist, und der Sprung zählt als CLS.
@@ -155,11 +187,11 @@ export function SourceViewer({
             aria-label="Text wird geladen"
             className="flex flex-col gap-2"
           >
-            {Array.from({ length: 8 }, (_, i) => (
+            {SKELETT_ZEILEN.map((breite, i) => (
               <div
                 key={i}
-                className="h-4 animate-pulse rounded bg-surface-2"
-                style={{ width: `${[100, 96, 99, 72, 100, 93, 98, 60][i]}%` }}
+                className="h-4 rounded bg-surface-2 motion-safe:animate-pulse"
+                style={{ width: `${breite}%` }}
               />
             ))}
           </div>
@@ -211,7 +243,7 @@ function Markiert({
   return (
     <>
       {text.slice(0, bereich.von)}
-      <mark ref={markeRef} className="rounded-[3px] bg-accent px-0.5 text-on-accent">
+      <mark ref={markeRef} className="rounded-highlight bg-accent px-0.5 text-on-accent">
         {text.slice(bereich.von, bereich.bis)}
       </mark>
       {text.slice(bereich.bis)}
