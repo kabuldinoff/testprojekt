@@ -50,6 +50,16 @@ das Speicherkontingent.
 Eine Policy, die die Datei bloß verbirgt, sähe sonst genauso aus wie eine gelöschte, und der
 Test wäre grün, während der Speicher vollläuft.
 
+Dasselbe gilt beim **Notebook**, und dort in größerem Maßstab: Der Cascade nimmt `sources`,
+`source_chunks` und `audio_overviews` mit, die Dateien beider Buckets nicht. Wie groß das wird,
+zeigte das Aufräumen des lokalen Stacks — 1493 gelöschte Testkonten hinterließen **837
+Dateien, nicht eine ging mit.** `deleteNotebook` sammelt sie deshalb ein, bevor die Zeile fällt;
+`e2e/b1-notebook-crud` hält es fest.
+
+Der `audio`-Bucket hatte bis dahin überhaupt keine Löschpolicy (Migration 0014 holt sie nach).
+Zum Zeitpunkt von Migration 0011 gab es keinen Weg, einen Überblick loszuwerden — und was es
+nicht gibt, braucht keine Policy. Inzwischen gibt es ihn.
+
 ## Drosselung — was sie schützt und was nicht
 
 Sie schützt **kein Geheimnis**, sondern ein Kontingent. Die AI-Anbieter laufen im kostenlosen
@@ -214,7 +224,29 @@ Policies hat und nicht bloß „RLS an".
 
 - **Keine Virenprüfung hochgeladener Dateien.** Sie werden nie ausgeführt und nur als Text
   gelesen; ausgeliefert werden sie ausschließlich per Signed URL an den Besitzer selbst.
-- **Kein Rate-Limit** in dieser Scheibe. Kommt mit der Chat-Scheibe, wo die Aufrufe Geld
-  kosten. Bis dahin begrenzen die 20 Quellen pro Notebook und 10 MB pro Datei den Schaden.
 - **Keine Audit-Logs.** Für ein Produkt mit einem Nutzer pro Notebook gäbe es nichts zu
   rekonstruieren, was nicht ohnehin in den Zeilen steht.
+
+- **Keine Content-Security-Policy.** Die größte bewusste Lücke, und die einzige, die in einem
+  echten Projekt als Erstes zu schließen wäre.
+
+  Sie würde hier gegen genau eine Klasse schützen, die sonst offen bleibt: eingeschleustes
+  Skript. Der Weg dorthin ist schmal — Quelltext aus Dokumenten wird nie als HTML gerendert
+  (siehe oben), es gibt keine Benutzereingabe, die in `dangerouslySetInnerHTML` landet, und
+  externe Skripte lädt die Seite gar keine. Aber „schmal" ist nicht „keiner", und eine CSP ist
+  die Ebene, die auch dann trägt, wenn man an einer Stelle unaufmerksam war.
+
+  Nicht gebaut, weil sie **still bricht**: Ein fehlender `connect-src` legt den Chat-Stream
+  lahm, ein fehlender `media-src` den Audio-Player, und beides zeigt sich nicht beim Bauen,
+  sondern beim Benutzen. Eine Policy, die nicht über alle Wege gemessen wurde — Streaming,
+  Signed URLs aus zwei Buckets, `next/font`, das OG-Bild —, ist gefährlicher als keine: Sie
+  erzeugt Vertrauen und einen Ausfall, den niemand der Policy zuordnet.
+
+  Was sie enthalten müsste, wenn sie käme: `default-src 'self'`, `connect-src` für die
+  Supabase-Domain (Auth, PostgREST, Storage, Realtime) und die Chat-Route, `media-src` für die
+  signierten Audio-Adressen, `img-src 'self' data: blob:` für das OG-Bild und die Skelette,
+  `style-src 'self' 'unsafe-inline'` wegen der Inline-Stile, die Next für kritisches CSS
+  ausliefert, und `script-src 'self' 'nonce-…'` — was in Next 16 einen Nonce-Durchreicher in der
+  Middleware verlangt.
+
+  Der letzte Punkt ist der Grund, warum es keine Nachmittagsarbeit ist.

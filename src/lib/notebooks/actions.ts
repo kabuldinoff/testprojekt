@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isProviderId } from '@/lib/llm/registry'
 
 import { firstIssue, parseNotebookForm } from './schema'
+import { removeFiles } from '@/lib/storage/files'
 
 /**
  * Anlegen, Ändern und Löschen von Notebooks.
@@ -97,6 +98,55 @@ export async function deleteNotebook(
   _formData: FormData
 ): Promise<FormState> {
   const { supabase } = await requireUserId()
+
+  // ── Erst die Dateien, dann die Zeile ────────────────────────────────────
+  //
+  // Der Cascade räumt `sources`, `source_chunks` und `audio_overviews` ab —
+  // aber **nicht** den Storage; der hängt nicht am Schema. Ohne diese Zeilen
+  // bleiben die Dateien des Notebooks für immer liegen, unauffindbar, und
+  // zählen weiter gegen das Gigabyte im kostenlosen Tarif.
+  //
+  // Beide Abfragen laufen über den RLS-Client: Ein fremdes Notebook liefert
+  // nichts, und damit wird auch nichts entfernt.
+  const [quellenAbfrage, ueberblickAbfrage] = await Promise.all([
+    supabase.from('sources').select('storage_path').eq('notebook_id', notebookId),
+    supabase
+      .from('audio_overviews')
+      .select('storage_path')
+      .eq('notebook_id', notebookId)
+      .maybeSingle<{ storage_path: string | null }>()
+  ])
+
+  // **Ein Abfragefehler bricht ab, bevor irgendetwas gelöscht wird.**
+  //
+  // Die erste Fassung hat die Fehler beim Destrukturieren weggeworfen. Das ist
+  // genau die Falle, um die es in dieser Scheibe geht: Scheitert eine der
+  // beiden Abfragen, ist `data` leer, `removeFiles` bekommt nichts zu tun und
+  // meldet Erfolg — und danach fällt die Zeile. Die Dateien wären für immer
+  // verwaist, ausgelöst durch einen Fehler, den niemand gesehen hat.
+  //
+  // Leer ist nicht dasselbe wie kaputt, und nur der Fehler unterscheidet die
+  // beiden.
+  if (quellenAbfrage.error || ueberblickAbfrage.error) {
+    console.error(
+      '[notebook] Dateipfade nicht lesbar, Löschen abgebrochen',
+      notebookId,
+      quellenAbfrage.error ?? ueberblickAbfrage.error
+    )
+    return {
+      error: 'Das Notebook konnte nicht gelöscht werden. Bitte erneut versuchen.'
+    }
+  }
+
+  const quellenFehler = await removeFiles(
+    supabase,
+    'sources',
+    (quellenAbfrage.data ?? []).map((q: { storage_path: string | null }) => q.storage_path)
+  )
+  if (quellenFehler) return { error: quellenFehler }
+
+  const audioFehler = await removeFiles(supabase, 'audio', [ueberblickAbfrage.data?.storage_path])
+  if (audioFehler) return { error: audioFehler }
 
   const { error } = await supabase.from('notebooks').delete().eq('id', notebookId)
 

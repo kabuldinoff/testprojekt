@@ -1,0 +1,41 @@
+-- ══════════════════════════════════════════════════════════════════════════
+-- Die fehlende Löschpolicy auf dem `audio`-Bucket.
+--
+-- ── Was ohne sie passiert ────────────────────────────────────────────────
+--
+-- Der Fremdschlüssel räumt beim Löschen eines Notebooks die Datenbank auf —
+-- `sources`, `source_chunks`, `audio_overviews` gehen per Cascade mit.
+-- **Supabase Storage hängt nicht am Schema.** Die Dateien bleiben liegen, und
+-- niemand kommt mehr an sie heran: Die Zeile, die auf sie zeigte, gibt es
+-- nicht mehr.
+--
+-- Nachgemessen beim Aufräumen des lokalen Stacks: 1493 Testkonten gelöscht,
+-- damit 1070 Notebooks, 827 Quellen und 84 Audio-Überblicke — und **837
+-- Storage-Dateien blieben liegen, nicht eine ging mit.** Bei einem Gigabyte im
+-- kostenlosen Tarif ist das die Sorte Ausfall, die bei einer Vorführung
+-- auftritt und dann „der Speicher ist voll" heißt.
+--
+-- Migration 0004 hat die Policy für den `sources`-Bucket bereits angelegt, mit
+-- genau dieser Begründung. Für `audio` fehlte sie: Zum Zeitpunkt von Migration
+-- 0011 gab es noch keinen Weg, einen Überblick loszuwerden, und was es nicht
+-- gibt, braucht keine Policy. Inzwischen gibt es ihn.
+--
+-- ── Warum `authenticated` und nicht `service_role` ───────────────────────
+--
+-- Weil Löschen eine Handlung des Nutzers ist und die Policy sie tragen soll —
+-- dieselbe Überlegung wie bei `sources`. Der Worker, der mit erhöhten Rechten
+-- läuft, braucht sie gar nicht: Er legt Dateien an und überschreibt sie
+-- (`upsert`), er entfernt keine.
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- Der erste Pfadabschnitt ist die Nutzer-ID; daran hängen im `audio`-Bucket
+-- bereits die Lese-Policy aus Migration 0011 und der Pfad, den der Worker
+-- schreibt (`{user_id}/{notebook_id}.wav`).
+--
+-- `(select auth.uid())` statt `auth.uid()`: erzeugt einen InitPlan, der einmal
+-- je Statement ausgewertet wird statt einmal je Zeile. Beim Entfernen mehrerer
+-- Dateien in einem Aufruf ist das der Unterschied zwischen einer und vielen
+-- Auswertungen.
+create policy "audio-bucket: eigene Dateien löschen"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'audio' and (storage.foldername(name))[1] = (select auth.uid())::text);

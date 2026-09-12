@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { uniqueEmail } from './lib/supabase'
+import { asService, uniqueEmail } from './lib/supabase'
 
 /**
  * b1 — Notebooks anlegen, ändern, löschen.
@@ -124,6 +124,91 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app$/)
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
+})
+
+test('mit dem Notebook verschwinden auch seine Dateien', async ({ page, playwright }) => {
+  // Der Teil, den niemand sieht. Der Fremdschlüssel räumt `sources`,
+  // `source_chunks` und `audio_overviews` per Cascade ab — **Supabase Storage
+  // hängt nicht am Schema.** Ohne das Einsammeln blieben die Dateien liegen,
+  // unauffindbar, und zählten weiter gegen das Gigabyte im kostenlosen Tarif.
+  //
+  // Nachgemessen beim Aufräumen des lokalen Stacks: 1070 gelöschte Notebooks
+  // hinterließen 837 Dateien, nicht eine ging mit.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Mit Anhang')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+  const notebookId = page.url().split('/').pop()!
+
+  const panel = page.getByRole('region', { name: 'Quelle hinzufügen' })
+  await panel.getByRole('tab', { name: 'Text' }).click()
+  await panel.getByLabel('Titel').fill('Anhang')
+  await panel.getByLabel('Inhalt').fill('Die Marge stieg deutlich an. '.repeat(20))
+  await panel.getByRole('button', { name: 'Hinzufügen' }).click()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Anhang' })).toHaveAttribute(
+    'data-status',
+    'ready',
+    { timeout: 30_000 }
+  )
+
+  // Und einen Audio-Überblick dazu. Ohne ihn prüfte der Test nur den
+  // `sources`-Bucket — und genau der Audio-Pfad ist der, für den Migration
+  // 0014 die Löschpolicy überhaupt erst nachgeholt hat. Der erste Anlauf
+  // dieses Tests hatte ihn nicht, und die Lücke wäre unbemerkt geblieben.
+  await page
+    .getByRole('region', { name: 'Studio' })
+    .getByRole('button', {
+      name: 'Audio-Überblick erzeugen'
+    })
+    .click()
+  await expect(page.getByRole('region', { name: 'Studio' }).locator('audio')).toBeVisible({
+    timeout: 120_000
+  })
+
+  // Die Pfade holen, solange es die Zeilen noch gibt. Mit dem Secret Key, weil
+  // nur er nachher zwischen „gelöscht" und „von einer Policy verborgen"
+  // unterscheiden kann — mit dem Token des Nutzers sähe beides gleich aus.
+  const api = await playwright.request.newContext()
+  const dienst = asService(api)
+
+  const pfade: Array<{ bucket: string; pfad: string }> = []
+  for (const [bucket, abfrage] of [
+    ['sources', `sources?notebook_id=eq.${notebookId}&select=storage_path`],
+    ['audio', `audio_overviews?notebook_id=eq.${notebookId}&select=storage_path`]
+  ] as const) {
+    const zeilen = (await (await dienst.get(abfrage)).json()) as Array<{
+      storage_path: string | null
+    }>
+    for (const z of zeilen) {
+      expect(z.storage_path, `${bucket}: kein Pfad in der Zeile`).toBeTruthy()
+      pfade.push({ bucket, pfad: z.storage_path! })
+    }
+  }
+  expect(pfade.length, 'es sollten zwei Dateien sein, eine je Bucket').toBe(2)
+
+  const ordnerVon = (p: string) => p.slice(0, p.lastIndexOf('/'))
+  const namenVon = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+  for (const { bucket, pfad } of pfade) {
+    expect(await dienst.storageNames(bucket, ordnerVon(pfad)), `${bucket}: vorher`).toContain(
+      namenVon(pfad)
+    )
+  }
+
+  await oeffneEinstellungen(page)
+  await page.getByText('Ja, ich möchte löschen').click()
+  await page.getByRole('button', { name: /endgültig löschen/ }).click()
+  await expect(page).toHaveURL(/\/app$/)
+
+  for (const { bucket, pfad } of pfade) {
+    expect(
+      await dienst.storageNames(bucket, ordnerVon(pfad)),
+      `${pfad} liegt noch im Bucket ${bucket}`
+    ).not.toContain(namenVon(pfad))
+  }
+
+  await api.dispose()
 })
 
 test('ein fremdes Notebook ergibt 404, nicht 403', async ({ page, browser }) => {
