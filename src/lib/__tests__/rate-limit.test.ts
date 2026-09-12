@@ -7,11 +7,29 @@
  * in `limits.ts` behaupten — und genau die gehen beim nächsten Nachjustieren
  * verloren, wenn niemand sie festhält.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { GRENZEN, ZU_VIELE, type Bucket } from '../rate-limit/limits'
 
 const TOEPFE = Object.keys(GRENZEN) as Bucket[]
+
+/**
+ * Kürzer als das ist keine Auskunft, sondern ein Schulterzucken.
+ *
+ * „Zu viele Anfragen." nennt weder, worum es geht, noch was der Nutzer tun
+ * kann. Die Schwelle ist bewusst grob — sie soll keinen Stil erzwingen,
+ * sondern verhindern, dass beim schnellen Nachbessern ein Zweiwortsatz
+ * stehenbleibt.
+ */
+const MINDESTLAENGE_MELDUNG = 20
+
+const MIGRATION = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260912000013_rate_limit.sql'),
+  'utf8'
+)
 
 describe('die Grenzen', () => {
   it('decken genau die drei teuren Vorgänge ab', () => {
@@ -24,27 +42,87 @@ describe('die Grenzen', () => {
     const g = GRENZEN[topf]
     expect(g.limit).toBeGreaterThan(0)
     expect(g.window).toMatch(/^\d+ (second|minute|hour|day)s?$/)
-    expect(g.message.length).toBeGreaterThan(20)
+    expect(g.message.length).toBeGreaterThan(MINDESTLAENGE_MELDUNG)
   })
 
-  it('Audio ist der knappste Topf und zählt über den Tag', () => {
-    // Die Begründung aus `limits.ts`: Das Tageskontingent der Sprachausgabe
-    // zeigt sich erst als 429 vom Anbieter und ist dann bis Mitternacht weg.
-    // Eine Stundengrenze schützte davor nicht — sechs pro Stunde wären
+  it('die Zahlen stimmen mit der Datenbank überein', () => {
+    // **Der wichtigste Test dieser Datei.**
+    //
+    // Maßgeblich sind die Werte in `consume_rate_limit`: Eine Drosselung,
+    // deren Grenze der Aufrufer mitgibt, ist keine — die erste Fassung nahm
+    // `p_limit` und `p_window` entgegen und war damit vollständig umgehbar.
+    // `limits.ts` ist seitdem ein Spiegel, und ein Spiegel kann schief hängen.
+    //
+    // Gelesen wird die Migration als Text, nicht als ausgeführtes SQL: Der
+    // Test soll ohne Datenbank laufen. Dasselbe Vorgehen wie bei den
+    // Design-Tokens, die gegen `globals.css` geprüft werden.
+    for (const topf of TOEPFE) {
+      const zweig = new RegExp(
+        `when '${topf}' then\\s*v_limit := (\\d+); v_window := interval '([^']+)'`
+      ).exec(MIGRATION)
+
+      expect(zweig, `kein Zweig für „${topf}" in der Migration`).not.toBeNull()
+      expect(Number(zweig![1]), `${topf}: Grenze`).toBe(GRENZEN[topf].limit)
+      expect(zweig![2], `${topf}: Fenster`).toBe(GRENZEN[topf].window)
+    }
+  })
+
+  it('die Migration nimmt Grenze und Fenster nicht als Parameter entgegen', () => {
+    // Die Gegenprobe zur Sicherheitslücke selbst. Stünde `p_limit` wieder in
+    // der Signatur, wäre die Drosselung erneut umgehbar — und dieser Test
+    // bliebe ohne die Zeile hier grün, weil die Werte daneben trotzdem
+    // stimmten.
+    const signatur = /create function public\.consume_rate_limit\(([^)]*)\)/.exec(MIGRATION)
+    expect(signatur).not.toBeNull()
+    expect(signatur![1]!.trim()).toBe('p_bucket text')
+  })
+
+  it('die Funktionen sind für Clients gesperrt, bis ausdrücklich gewährt', () => {
+    // Postgres vergibt `execute` auf einer neuen Funktion standardmäßig an
+    // `public`. Ohne Entzug stand `reap_rate_limits` **ohne Token** offen —
+    // nachgemessen, bevor es korrigiert wurde.
+    for (const fn of ['consume_rate_limit(text)', 'reap_rate_limits()']) {
+      expect(MIGRATION, `kein revoke für ${fn}`).toContain(
+        `revoke all on function public.${fn} from public, anon, authenticated`
+      )
+    }
+    expect(MIGRATION).toContain(
+      'grant execute on function public.consume_rate_limit(text) to authenticated'
+    )
+  })
+
+  it('Audio ist der knappste Topf und zählt über 24 rollende Stunden', () => {
+    // Die Begründung aus `limits.ts`: Das Kontingent der Sprachausgabe zeigt
+    // sich erst als 429 vom Anbieter und ist dann für lange Zeit weg. Eine
+    // Stundengrenze schützte davor nicht — sechs pro Stunde wären
     // vierundzwanzigmal sechs am Tag.
     expect(GRENZEN.audio.window).toBe('24 hours')
+    expect(GRENZEN.audio.limit).toBe(6)
     expect(GRENZEN.audio.limit).toBeLessThan(GRENZEN.chat.limit)
     expect(GRENZEN.audio.limit).toBeLessThan(GRENZEN.ingest.limit)
   })
 
-  it('Quellen dürfen in Schüben kommen, Fragen nicht', () => {
-    // Wer ein Projekt anlegt, wirft zehn Dateien auf einmal hinein; wer fragt,
-    // fragt nacheinander. Deshalb liegt `ingest` pro Vorgang großzügiger.
-    expect(GRENZEN.ingest.window).toBe(GRENZEN.chat.window)
+  it('Quellen und Fragen teilen sich das Stundenfenster', () => {
+    // Beide sind Handlungen einer Arbeitssitzung und werden im selben Rhythmus
+    // gemessen. Verschiedene Fenster hätten keinen Grund und wären nur eine
+    // Zahl mehr, die man beim Nachjustieren übersieht.
+    expect(GRENZEN.ingest.window).toBe('1 hour')
+    expect(GRENZEN.chat.window).toBe('1 hour')
+
+    // Eine Quelle kostet mehr als eine Frage: Parsen, Zerlegen und Einbetten
+    // des ganzen Dokuments gegen ein Embedding für eine Zeile.
+    expect(GRENZEN.ingest.limit).toBeLessThan(GRENZEN.chat.limit)
   })
 })
 
 describe('die Meldungen', () => {
+  it.each(TOEPFE)('%s verspricht keinen Kalendertag', (topf) => {
+    // Das Fenster ist rollend: Es beginnt beim ersten Vorgang und endet 24
+    // Stunden später, nicht um Mitternacht. „Morgen geht es weiter" stand hier
+    // und war damit für jeden falsch, der nach Mitternacht anfängt.
+    expect(GRENZEN[topf].message).not.toMatch(/Morgen|Mitternacht|heute/i)
+  })
+
   it.each(TOEPFE)('%s verspricht keine Uhrzeit, die niemand einhalten kann', (topf) => {
     // „In 23 Minuten geht es weiter" wäre eine Zusage über einen Zeitpunkt,
     // den die Anwendung gar nicht kennt: Das Fenster beginnt beim ersten

@@ -17,18 +17,18 @@ import { GRENZEN, type Bucket } from './limits'
  */
 export interface Entscheidung {
   erlaubt: boolean
-  /** Nur gesetzt, wenn nicht erlaubt. */
   message?: string
 }
 
 export async function verbrauche(supabase: SupabaseClient, bucket: Bucket): Promise<Entscheidung> {
-  const grenze = GRENZEN[bucket]
-
-  const { data, error } = await supabase.rpc('consume_rate_limit', {
-    p_bucket: bucket,
-    p_limit: grenze.limit,
-    p_window: grenze.window
-  })
+  // **Nur der Topfname.** Grenze und Fenster stehen in der Datenbankfunktion.
+  //
+  // Die erste Fassung reichte beides durch, und das machte die Drosselung
+  // wirkungslos: Derselbe Nutzer kann die Funktion über PostgREST direkt
+  // aufrufen und `p_window => '0 seconds'` mitgeben — das Fenster gilt sofort
+  // als abgelaufen, der Zähler springt auf eins, und der Aufruf der Route
+  // findet einen frischen Topf vor. Nachgemessen: bei Grenze 3 fünfmal `true`.
+  const { data, error } = await supabase.rpc('consume_rate_limit', { p_bucket: bucket })
 
   if (error) {
     // **Durchlassen, nicht sperren.**
@@ -44,5 +44,5 @@ export async function verbrauche(supabase: SupabaseClient, bucket: Bucket): Prom
     return { erlaubt: true }
   }
 
-  return data === true ? { erlaubt: true } : { erlaubt: false, message: grenze.message }
+  return data === true ? { erlaubt: true } : { erlaubt: false, message: GRENZEN[bucket].message }
 }

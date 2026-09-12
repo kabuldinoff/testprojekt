@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { PROVIDERS, type ProviderId } from '@/lib/llm/registry'
 import { formatDuration } from '@/lib/studio/format'
 import { parseScript } from '@/lib/studio/script'
+import { LAUFENDE_AUDIO_ZUSTAENDE } from '@/lib/studio/status'
 
 /**
  * Der Audio-Überblick: erzeugen, anhören, mitlesen.
@@ -45,7 +46,7 @@ export interface AudioOverviewItem {
   loadProblem: 'signatur' | null
 }
 
-const LAEUFT = new Set(['pending', 'processing'])
+const LAEUFT = LAUFENDE_AUDIO_ZUSTAENDE
 
 export function AudioOverview({
   notebookId,

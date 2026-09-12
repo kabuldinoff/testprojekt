@@ -216,7 +216,11 @@ test('an die Drossel-Zähler kommt niemand heran — auch nicht an die eigenen',
     ['löschen', () => api.delete('rate_limits?bucket=eq.chat')]
   ] as const) {
     const antwort = await aufruf()
-    expect(antwort.ok(), `${name} war erlaubt: ${await antwort.text()}`).toBe(false)
+    // **403 und nicht nur „nicht ok".** `toBe(false)` nähme auch einen 404
+    // oder 500 an — dann bliebe der Test grün, weil ein Schema- oder
+    // Serverfehler den Zugriff verhindert, und nicht die Rechteprüfung. Genau
+    // das ist der Unterschied zwischen „abgelehnt" und „zufällig kaputt".
+    expect(antwort.status(), `${name}: ${await antwort.text()}`).toBe(403)
   }
 })
 
@@ -227,21 +231,35 @@ test('die Drossel-Funktion verbraucht nur das eigene Kontingent', async ({ reque
   //
   // Geprüft wird das Verhalten und nicht die Signatur: Mallory leert ihren
   // Topf, und Alices bleibt unberührt.
-  const topf = `probe-${Date.now()}`
+  //
+  // Geprüft wird über den **Audio-Topf**, weil der mit sechs die niedrigste
+  // Grenze hat: Mallory leert ihn, und Alices muss unberührt sein. Einen
+  // eigenen Topf zum Testen gibt es nicht mehr — die Funktion nimmt weder
+  // Grenze noch Fenster entgegen, und ein unbekannter Name wirft.
   const verbrauchen = (wer: TestUser) =>
-    asUser(request, wer).post('rpc/consume_rate_limit', {
-      p_bucket: topf,
-      p_limit: 1,
-      p_window: '1 hour'
-    })
+    asUser(request, wer).post('rpc/consume_rate_limit', { p_bucket: 'audio' })
 
-  expect(await (await verbrauchen(mallory)).json()).toBe(true)
+  for (let i = 0; i < 6; i++) {
+    expect(await (await verbrauchen(mallory)).json(), `Mallorys Versuch ${i + 1}`).toBe(true)
+  }
   expect(await (await verbrauchen(mallory)).json(), 'Mallorys Grenze greift').toBe(false)
 
   expect(
     await (await verbrauchen(alice)).json(),
     'Mallorys Verbrauch hat Alices Topf geleert'
   ).toBe(true)
+})
+
+test('ein erfundener Topf wird abgewiesen, nicht stillschweigend durchgelassen', async ({
+  request
+}) => {
+  // Ein unbekannter Name heißt, dass jemand in der Anwendung einen Topf
+  // angelegt und in der Migration vergessen hat. Durchlassen wäre eine
+  // ungedrosselte Route, von der niemand weiß.
+  const antwort = await asUser(request, alice).post('rpc/consume_rate_limit', {
+    p_bucket: 'gibt-es-nicht'
+  })
+  expect(antwort.ok()).toBe(false)
 })
 
 test('Mallory sieht Alices Profil nicht', async ({ request }) => {

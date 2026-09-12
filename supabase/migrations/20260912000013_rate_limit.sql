@@ -58,6 +58,21 @@ alter table public.rate_limits enable row level security;
 
 -- ── Der Verbrauch, atomar ────────────────────────────────────────────────
 --
+-- **Grenze und Fenster stehen hier und kommen nicht vom Aufrufer.**
+--
+-- Die erste Fassung nahm beides als Parameter entgegen — die Route hätte
+-- `consume_rate_limit('chat', 40, '1 hour')` gerufen. Das war wirkungslos, und
+-- zwar vollständig: Ein angemeldeter Nutzer ruft dieselbe Funktion direkt über
+-- PostgREST mit `p_window => '0 seconds'` auf, das Fenster gilt sofort als
+-- abgelaufen, der Zähler springt auf eins — und der anschließende Aufruf der
+-- Route sieht einen frischen Topf. Nachgemessen: bei Grenze 3 fünfmal `true`
+-- statt dreimal.
+--
+-- Eine Drosselung, deren Parameter der Gedrosselte mitbringt, ist keine. Die
+-- Werte gehören deshalb dorthin, wo er nicht hinkommt; `src/lib/rate-limit/
+-- limits.ts` spiegelt sie für Oberfläche und Tests, und
+-- `src/lib/__tests__/rate-limit.test.ts` liest diese Datei und vergleicht.
+--
 -- `security definer`, und das ist die dokumentierte Ausnahme von der Regel in
 -- CLAUDE.md. Die Regel lautet: von PostgREST exponierte Funktionen sind
 -- `security invoker`, weil `definer` als `postgres` läuft und RLS umgeht. Der
@@ -77,7 +92,7 @@ alter table public.rate_limits enable row level security;
 --     diesem Muster.
 --   * `set search_path = public` verhindert, dass ein untergeschobenes Schema
 --     die Bedeutung von `rate_limits` verschiebt.
-create function public.consume_rate_limit(p_bucket text, p_limit integer, p_window interval)
+create function public.consume_rate_limit(p_bucket text)
 returns boolean
 language plpgsql
 security definer
@@ -85,6 +100,8 @@ set search_path = public
 as $$
 declare
   v_user uuid := (select auth.uid());
+  v_limit integer;
+  v_window interval;
   v_count integer;
 begin
   -- Ohne Anmeldung gibt es nichts zu verbrauchen. Die Routen prüfen das
@@ -93,6 +110,24 @@ begin
   if v_user is null then
     return false;
   end if;
+
+  -- Die Zahlen und ihre Begründung stehen in src/lib/rate-limit/limits.ts.
+  -- Kurz: 40 Fragen und 30 Quellen je Stunde sind mehr, als ein Mensch in
+  -- einer Stunde tut; Audio zählt als einziges über den Tag, weil das
+  -- Kontingent der Sprachausgabe so bemessen ist.
+  case p_bucket
+    when 'chat' then
+      v_limit := 40; v_window := interval '1 hour';
+    when 'ingest' then
+      v_limit := 30; v_window := interval '1 hour';
+    when 'audio' then
+      v_limit := 6; v_window := interval '24 hours';
+    else
+      -- Nicht stillschweigend durchlassen und nicht stillschweigend sperren.
+      -- Ein unbekannter Topf heißt, dass jemand in der Anwendung einen
+      -- angelegt und hier vergessen hat; das soll auffallen.
+      raise exception 'unbekannter Drossel-Topf: %', p_bucket;
+  end case;
 
   -- Ein einziges Statement, und das ist der Punkt. Lesen, prüfen, schreiben
   -- als drei Schritte hätte zwischen Schritt eins und drei eine Lücke, in der
@@ -106,22 +141,27 @@ begin
   insert into public.rate_limits as r (user_id, bucket, window_start, count)
   values (v_user, p_bucket, now(), 1)
   on conflict (user_id, bucket) do update
-    set window_start = case when now() - r.window_start >= p_window then now() else r.window_start end,
-        count        = case when now() - r.window_start >= p_window then 1 else r.count + 1 end
+    set window_start = case when now() - r.window_start >= v_window then now() else r.window_start end,
+        count        = case when now() - r.window_start >= v_window then 1 else r.count + 1 end
   returning r.count into v_count;
 
   -- Über der Grenze wird trotzdem gezählt. Wer weiter klopft, verlängert
   -- damit seine Sperre nicht — das Fenster läuft ab wann es abläuft —, aber
   -- der Zähler bleibt die ehrliche Auskunft darüber, wie viel versucht wurde.
-  return v_count <= p_limit;
+  return v_count <= v_limit;
 end;
 $$;
 
 comment on function public.consume_rate_limit is
-  'Zählt einen Vorgang im Topf des angemeldeten Nutzers und meldet, ob er noch erlaubt war.';
+  'Zählt einen Vorgang im Topf des angemeldeten Nutzers und meldet, ob er noch erlaubt war. Grenze und Fenster stehen in der Funktion, nicht im Aufruf.';
 
--- Ausführen darf jeder Angemeldete; die Tabelle dahinter bleibt unerreichbar.
-grant execute on function public.consume_rate_limit(text, integer, interval) to authenticated;
+-- Ausdrücklich entziehen, bevor gewährt wird: Postgres vergibt auf einer neuen
+-- Funktion standardmäßig `execute` an `public`. Ohne diese Zeile dürfte auch
+-- `anon` sie aufrufen — folgenlos, weil ohne Token kein Topf existiert, aber
+-- nichts, was man der Voreinstellung überlässt. Dasselbe Muster wie in
+-- Migration 0011 bei `claim_audio_overview`.
+revoke all on function public.consume_rate_limit(text) from public, anon, authenticated;
+grant execute on function public.consume_rate_limit(text) to authenticated;
 
 -- Der Index, den die Aufräumfunktion braucht. Ohne ihn wird das Wegräumen
 -- alter Zeilen zum Seq Scan über die am schnellsten wachsende Tabelle.
@@ -150,6 +190,13 @@ as $$
   )
   select coalesce(count(*), 0)::integer from weg;
 $$;
+
+-- Nur der Job darf das. Ohne diese Zeile stünde die Funktion über PostgREST
+-- offen — nachgemessen: Sie war **ohne Token** aufrufbar und antwortete mit 0.
+-- Der Schaden wäre gering (sie löscht nur abgelaufene Fenster), die Lücke
+-- trotzdem echt. `reap_stale_ingests` macht es seit Migration 0005 richtig;
+-- diese hier hatte es schlicht vergessen.
+revoke all on function public.reap_rate_limits() from public, anon, authenticated;
 
 -- Einmal täglich reicht: Es geht um Speicher, nicht um Korrektheit. Ein
 -- abgelaufenes Fenster wird beim nächsten Aufruf ohnehin zurückgesetzt.

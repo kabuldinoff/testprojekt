@@ -21,12 +21,25 @@
 /** Ein Topf. Der Name steht so auch in `rate_limits.bucket`. */
 export type Bucket = 'chat' | 'ingest' | 'audio'
 
+/**
+ * **Spiegel, nicht Quelle.**
+ *
+ * `limit` und `window` stehen maßgeblich in `consume_rate_limit`
+ * (Migration 0013) — sie müssen dort stehen, weil eine Drosselung, deren
+ * Parameter der Gedrosselte mitbringt, keine ist. Hier stehen sie, damit die
+ * Tests und der Testaufbau die Zahlen kennen, ohne SQL zu lesen.
+ *
+ * Zwei Orte heißen: Sie können auseinanderlaufen.
+ * `src/lib/__tests__/rate-limit.test.ts` liest deshalb die Migration und
+ * vergleicht — dasselbe Vorgehen wie bei den Design-Tokens, die gegen
+ * `globals.css` geprüft werden.
+ *
+ * `window` ist ein Postgres-Intervall in genau der Schreibweise, die in der
+ * Migration steht; der Vergleich ist wörtlich.
+ */
 export interface Grenze {
-  /** Wie viele Vorgänge im Fenster erlaubt sind. */
   limit: number
-  /** Fensterlänge als Postgres-Intervall — so, wie die Funktion sie erwartet. */
   window: string
-  /** Was der Nutzer liest, wenn nichts mehr geht. */
   message: string
 }
 
@@ -53,8 +66,11 @@ export const GRENZEN: Record<Bucket, Grenze> = {
    * diese Grenze gilt über **alle** Notebooks und fängt den Fall ab, den der
    * Trigger nicht sieht: fünfzig neue Notebooks mit je einer Quelle.
    *
-   * Höher als beim Chat, weil ein Hochladen oft in Schüben kommt: Wer ein
-   * Projekt anlegt, wirft zehn Dateien auf einmal hinein.
+   * Etwas niedriger als beim Chat, obwohl Hochladen in Schüben kommt: Wer ein
+   * Projekt anlegt, wirft zehn Dateien auf einmal hinein. Eine Quelle kostet
+   * aber mehr als eine Frage — Parsen, Zerlegen und Einbetten des **ganzen**
+   * Dokuments statt eines Embeddings für eine Zeile. Dreißig Dokumente in
+   * einer Stunde sind bereits viel.
    */
   ingest: {
     limit: 30,
@@ -66,8 +82,8 @@ export const GRENZEN: Record<Bucket, Grenze> = {
   /**
    * Audio: 6 Überblicke pro Tag.
    *
-   * Der knappste Topf im ganzen Projekt, und als einziger auf einen **Tag**
-   * gestellt. Das Tageskontingent der Sprachausgabe ist von Google nicht
+   * Der knappste Topf im ganzen Projekt, und als einziger auf **24 rollende
+   * Stunden** gestellt — nicht auf einen Kalendertag. Das Tageskontingent der Sprachausgabe ist von Google nicht
    * dokumentiert und zeigt sich erst als 429; ist es erschöpft, ist es für den
    * Rest des Tages weg. Eine Stundengrenze schützte davor nicht — sechs pro
    * Stunde wären vierundzwanzig mal sechs am Tag.
@@ -79,7 +95,7 @@ export const GRENZEN: Record<Bucket, Grenze> = {
     limit: 6,
     window: '24 hours',
     message:
-      'Heute wurden bereits mehrere Audio-Überblicke erzeugt. Morgen geht es weiter — das Transkript bestehender Überblicke bleibt lesbar.'
+      'Es wurden bereits mehrere Audio-Überblicke erzeugt. Später geht es weiter — das Transkript bestehender Überblicke bleibt lesbar.'
   }
 }
 

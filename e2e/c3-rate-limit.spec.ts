@@ -50,7 +50,12 @@ async function kontingentLeeren(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      data: { p_bucket: topf, p_limit: grenze.limit, p_window: grenze.window }
+      // Ohne Grenze und Fenster: Die Funktion nimmt beides nicht mehr entgegen.
+      // Die erste Fassung tat es, und genau das machte die Drosselung
+      // umgehbar — ein Aufrufer setzte mit `p_window => '0 seconds'` seinen
+      // eigenen Zähler zurück. Dieser Test hätte davon nichts gemerkt: Er
+      // benutzte den Ausgang, der die Lücke war.
+      data: { p_bucket: topf }
     })
     expect(antwort.ok(), await antwort.text()).toBe(true)
   }
@@ -125,12 +130,8 @@ test('die Grenze fürs Anlegen von Quellen greift über alle Notebooks', async (
 })
 
 test('der Audio-Topf zählt über den Tag, nicht über die Stunde', async ({ page, request }) => {
-  // Der knappste Topf: Das Tageskontingent der Sprachausgabe zeigt sich erst
-  // als 429 vom Anbieter und ist dann für den Rest des Tages weg. Eine
-  // Stundengrenze schützte davor nicht.
-  expect(GRENZEN.audio.window).toContain('hours')
-  expect(GRENZEN.audio.limit).toBeLessThan(GRENZEN.chat.limit)
-
+  // Die Zahlen selbst prüft `src/lib/__tests__/rate-limit.test.ts` — dort auch
+  // gegen die Migration. Hier geht es nur um das sichtbare Verhalten.
   const token = await nutzerMitToken(page, request)
   const notebookId = await notebookAnlegen(page)
 
@@ -142,6 +143,31 @@ test('der Audio-Topf zählt über den Tag, nicht über die Stunde', async ({ pag
   expect((await antwort.json()) as { message: string }).toMatchObject({
     message: GRENZEN.audio.message
   })
+})
+
+test.describe('positive Kontrollen — die Routen drosseln nicht immer', () => {
+  // Ohne diese drei bliebe die halbe Datei grün, wenn eine Route unabhängig
+  // vom Kontingent **immer** 429 antwortete. Und das wäre der schlimmere
+  // Fehler von beiden: Eine Drosselung, die nie greift, kostet Kontingent —
+  // eine, die immer greift, kostet das Produkt.
+  //
+  // Geprüft wird „nicht 429" und kein bestimmter Erfolgscode. Was eine Route
+  // bei einem leeren Notebook sonst antwortet, ist ihre Sache und anderswo
+  // geprüft; hier zählt allein, dass die Drossel nicht im Weg steht.
+  for (const [topf, pfad, koerper] of [
+    ['chat', '/api/chat', { question: 'Wie war die Marge?', sourceIds: null }],
+    ['audio', '/api/studio/audio', {}],
+    ['ingest', '/api/sources', { kind: 'paste', title: 'Geht', content: 'x'.repeat(200) }]
+  ] as const) {
+    test(`${topf} mit freiem Kontingent`, async ({ page, request }) => {
+      await nutzerMitToken(page, request)
+      const notebookId = await notebookAnlegen(page)
+
+      const antwort = await page.request.post(pfad, { data: { notebookId, ...koerper } })
+
+      expect(antwort.status(), `${topf} hat gedrosselt, obwohl nichts verbraucht war`).not.toBe(429)
+    })
+  }
 })
 
 test('ein unverbrauchtes Kontingent lässt den Vorgang durch', async ({ page, request }) => {
@@ -157,7 +183,7 @@ test('ein unverbrauchtes Kontingent lässt den Vorgang durch', async ({ page, re
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    data: { p_bucket: 'ingest', p_limit: GRENZEN.ingest.limit, p_window: GRENZEN.ingest.window }
+    data: { p_bucket: 'ingest' }
   })
 
   const antwort = await page.request.post('/api/sources', {
@@ -165,6 +191,58 @@ test('ein unverbrauchtes Kontingent lässt den Vorgang durch', async ({ page, re
   })
 
   expect(antwort.status()).toBe(200)
+})
+
+test('eine abgewiesene Audio-Anfrage verbraucht kein Kontingent', async ({ page, request }) => {
+  // Der Befund aus dem Review, festgenagelt.
+  //
+  // Gedrosselt wurde zuerst ganz oben, vor allem anderen. Eine Anfrage,
+  // während bereits ein Überblick läuft, endet aber mit 409 — es beginnt keine
+  // Vertonung, und trotzdem war ein Platz von sechs verbraucht. Zwei offene
+  // Tabs hätten den Tag geleert, ohne dass eine einzige Datei entsteht.
+  const token = await nutzerMitToken(page, request)
+  const notebookId = await notebookAnlegen(page)
+
+  // Den laufenden Zustand direkt herstellen, statt einen echten Lauf
+  // abzuwarten: Gegen den Stub ist die Vertonung so schnell fertig, dass der
+  // zweite Aufruf bereits wieder auf `ready` trifft und 202 bekommt. Der Test
+  // war damit im ersten Anlauf rot — aus dem falschen Grund.
+  //
+  // Eine Zeile anzulegen darf der Nutzer selbst (`grant insert (notebook_id)`,
+  // Migration 0011), und ihr Vorgabezustand ist `pending`. Es läuft also
+  // nichts, aber die Route sieht dasselbe wie bei einem echten Lauf.
+  const angelegt = await request.post(`${SUPABASE_URL}/rest/v1/audio_overviews`, {
+    headers: {
+      apikey: PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    data: { notebook_id: notebookId }
+  })
+  expect(angelegt.ok(), await angelegt.text()).toBe(true)
+
+  const abgewiesen = await page.request.post('/api/studio/audio', { data: { notebookId } })
+  expect(abgewiesen.status(), await abgewiesen.text()).toBe(409)
+
+  // Jetzt zählen: Es wurde **nichts** verbraucht, also müssen alle sechs
+  // Plätze frei sein. Hätte der 409 mitgezählt, käme der sechste als `false`
+  // zurück.
+  const uebrig: boolean[] = []
+  for (let i = 0; i < GRENZEN.audio.limit; i++) {
+    const antwort = await request.post(`${SUPABASE_URL}/rest/v1/rpc/consume_rate_limit`, {
+      headers: {
+        apikey: PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { p_bucket: 'audio' }
+    })
+    uebrig.push((await antwort.json()) as boolean)
+  }
+
+  expect(uebrig, 'der abgewiesene Aufruf hat mitgezählt').toEqual(
+    Array.from({ length: GRENZEN.audio.limit }, () => true)
+  )
 })
 
 test('die Töpfe zweier Nutzer sind unabhängig', async ({ page, browser, request }) => {

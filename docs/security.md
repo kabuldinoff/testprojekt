@@ -68,9 +68,12 @@ Modulvariablen begrenzt also nichts.
 | `ingest` | 30     | 1 Stunde       |
 | `audio`  | 6      | **24 Stunden** |
 
-Audio zählt als einziges über den Tag, weil das Tageskontingent der Sprachausgabe genau so
-bemessen ist: Ist es erschöpft, ist es bis Mitternacht weg, und eine Stundengrenze schützte
-davor nicht.
+Audio zählt als einziges über 24 Stunden, weil das Kontingent der Sprachausgabe in dieser
+Größenordnung bemessen ist und eine Stundengrenze davor nicht schützte — sechs pro Stunde wären
+vierundzwanzigmal sechs.
+
+Das Fenster ist **rollend**, nicht kalendarisch: Es beginnt beim ersten Vorgang und endet 24
+Stunden später, nicht um Mitternacht. Deshalb verspricht die Meldung auch keinen Zeitpunkt.
 
 **Die Tabelle ist für Angemeldete unerreichbar** — keine Policy, kein `grant`, alle vier
 Operationen ergeben 403. Der einzige Weg führt über die Funktion, und die kann nur hochzählen.
