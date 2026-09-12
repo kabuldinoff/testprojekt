@@ -88,4 +88,27 @@ sonst:
 16. Eine zweite Quelle hinzufügen, neu erzeugen: Kommt sie im Gespräch vor? (Der Quelltext wird
     gleichmäßig auf die Quellen verteilt, damit ein großes Dokument die kleinen nicht verdrängt.)
 
+**Registrierung mit Bestätigung** — der Weg, den die Automatisierung **nicht** abdecken kann:
+
+Lokal steht `enable_confirmations = false` (`supabase/config.toml`, mit Begründung dort). Eine
+Registrierung liefert dort sofort eine Sitzung, es wird keine E-Mail verschickt, und der
+Bestätigungsweg existiert schlicht nicht. Genau darin steckte ein Fehler, den erst Produktion
+gezeigt hat: `signUp` nannte kein `emailRedirectTo`, der Code landete auf der Startseite und
+verfiel. `src/lib/__tests__/auth-signup-redirect.test.ts` beobachtet seitdem, **womit** die
+Action aufruft — dass die Gegenseite es akzeptiert, kann nur dieser Punkt hier zeigen.
+
+17. **Gegen Produktion** mit einer echten, noch nicht registrierten Adresse anmelden. Kommt die
+    Mail, und trägt sie die eigene Vorlage — deutsches „Nur noch ein Klick", das N-Zeichen, der
+    blaue Knopf — statt der englischen Standardvorlage von Supabase?
+18. Den Knopf anklicken. Landet man **direkt im Arbeitsbereich** und nicht auf der Startseite
+    oder der Anmeldeseite? Steht in der Adresszeile `/app` und kein `?code=`?
+19. Denselben Link ein zweites Mal öffnen: erscheint die Anmeldeseite mit einem Hinweis statt
+    einer Fehlerseite?
+20. Die Erfolgsmeldung nach dem Absenden nennt die eingegebene Adresse — stimmt sie mit dem
+    überein, was im Postfach ankommt?
+21. Zweimal hintereinander mit **verschiedenen** neuen Adressen registrieren. Die dritte muss
+    „das Kontingent ist für diese Stunde erschöpft" melden und nicht „Registrierung nicht
+    möglich": Der eingebaute Mailer verschickt zwei Nachrichten pro Stunde, projektweit.
+    ⚠️ Dieser Punkt verbraucht das Kontingent — nicht am Tag der Vorführung ausführen.
+
 Die übrigen produktbezogenen Punkte kommen mit den jeweiligen Scheiben hinzu.

@@ -1,0 +1,194 @@
+<!--
+  Bestätigungsmail zur Registrierung.
+
+  ── Warum diese Datei im Repo liegt ──────────────────────────────────────
+  Weil die Alternative das Dashboard ist, und was nur dort steht, steht
+  nirgends: Es taucht in keinem Diff auf, niemand reviewt es, und beim nächsten
+  Projekt beginnt man von vorn. Hier wird sie versioniert, der lokale Stack
+  liest sie über `supabase/config.toml`, und `docs/deployment.md` sagt, wie sie
+  ins Produktionsprojekt kommt — das ist ein Handgriff im Dashboard, weil die
+  gehostete Fassung keine Dateien aus dem Repo liest.
+
+  ── Warum das HTML so altmodisch aussieht ───────────────────────────────
+  Tabellen statt Flexbox, Stile am Element statt in einer Klasse, keine
+  Webfonts, kein `<style>`-Block. Nicht aus Nostalgie: Outlook rendert mit der
+  Word-Engine, Gmail entfernt `<style>`-Blöcke in weitergeleiteten Nachrichten,
+  und `@media` ist in vielen Clients wirkungslos. Was hier steht, überlebt das.
+
+  Die Farben sind die Tokens aus `src/app/globals.css`, ausgeschrieben: Eine
+  E-Mail kennt keine CSS-Variablen. Sie sind bewusst die der **hellen**
+  Ausprägung — der Dunkelmodus eines Mail-Clients ist nicht vorhersagbar, und
+  eine Nachricht, die in der Hälfte der Postfächer falsch aussieht, ist
+  schlimmer als eine, die überall gleich schlicht aussieht.
+
+  Variablen von Supabase: {{ .ConfirmationURL }} löst den Link ein,
+  {{ .Email }} ist die Adresse, an die geschickt wurde.
+-->
+<table
+  role="presentation"
+  width="100%"
+  cellpadding="0"
+  cellspacing="0"
+  border="0"
+  style="background-color: #f7f4ee; margin: 0; padding: 32px 12px"
+>
+  <tr>
+    <td align="center">
+      <table
+        role="presentation"
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        border="0"
+        style="
+          max-width: 520px;
+          background-color: #ffffff;
+          border: 1px solid #e4e9f2;
+          border-radius: 16px;
+        "
+      >
+        <tr>
+          <td style="padding: 28px 28px 0 28px">
+            <!-- Das Markenzeichen, gebaut wie im Produkt: dunkle Plakette, goldenes N.
+                 Als Tabelle und nicht als Bild — ein Bild wäre in den meisten
+                 Postfächern zunächst blockiert, und dann stünde oben nichts. -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td
+                  width="28"
+                  height="28"
+                  align="center"
+                  valign="middle"
+                  style="
+                    background-color: #0e1424;
+                    border-radius: 7px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #faef70;
+                    line-height: 28px;
+                  "
+                >
+                  N
+                </td>
+                <td
+                  style="
+                    padding-left: 2px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: #0e1424;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  otabene
+                </td>
+              </tr>
+            </table>
+
+            <p
+              style="
+                margin: 24px 0 0 0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size: 20px;
+                font-weight: 700;
+                color: #0e1424;
+                line-height: 1.3;
+              "
+            >
+              Nur noch ein Klick
+            </p>
+
+            <p
+              style="
+                margin: 12px 0 0 0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size: 15px;
+                color: #5a6472;
+                line-height: 1.6;
+              "
+            >
+              Jemand hat mit <strong style="color: #0e1424">{{ .Email }}</strong> ein Konto bei
+              Notabene angelegt. Bestätige die Adresse, dann geht es direkt in deinen
+              Arbeitsbereich.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 24px 28px 0 28px">
+            <!-- Der Knopf als Tabellenzelle mit Hintergrund, nicht als <button>
+                 oder <div>: Nur so bekommt er in Outlook eine Fläche. -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background-color: #2563eb; border-radius: 12px">
+                  <a
+                    href="{{ .ConfirmationURL }}"
+                    style="
+                      display: inline-block;
+                      padding: 13px 22px;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                      font-size: 15px;
+                      font-weight: 700;
+                      color: #ffffff;
+                      text-decoration: none;
+                    "
+                  >
+                    Adresse bestätigen
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 20px 28px 28px 28px">
+            <!-- Derselbe Link als Text. Manche Clients machen aus dem Knopf
+                 nichts Anklickbares, und dann ist das hier der einzige Weg. -->
+            <p
+              style="
+                margin: 0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size: 13px;
+                color: #707784;
+                line-height: 1.6;
+              "
+            >
+              Funktioniert der Knopf nicht, öffne diese Adresse:<br />
+              <a href="{{ .ConfirmationURL }}" style="color: #2563eb; word-break: break-all"
+                >{{ .ConfirmationURL }}</a
+              >
+            </p>
+
+            <p
+              style="
+                margin: 20px 0 0 0;
+                padding-top: 16px;
+                border-top: 1px solid #e4e9f2;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size: 13px;
+                color: #707784;
+                line-height: 1.6;
+              "
+            >
+              Der Link gilt eine Stunde. Warst du das nicht, ignoriere diese Nachricht — ohne
+              Bestätigung entsteht kein Konto.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <p
+        style="
+          margin: 16px 0 0 0;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+          font-size: 12px;
+          color: #707784;
+        "
+      >
+        Notabene — ein Rechercheassistent für die eigenen Dokumente
+      </p>
+    </td>
+  </tr>
+</table>

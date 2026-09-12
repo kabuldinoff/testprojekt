@@ -109,14 +109,42 @@ Loopback-Adressen zu und wirft sonst; siehe ADR 0006.
 
 ## Was außerhalb dieses Repos eingestellt werden muss
 
-Zwei Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig vergessen:
+Vier Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig vergessen:
 
 1. **Supabase → Authentication → URL Configuration.** Die _Site URL_ muss auf die
    Produktionsadresse zeigen, und `https://<domain>/auth/callback` gehört in die Liste der
-   erlaubten Weiterleitungen. Steht dort noch `localhost`, führt der Bestätigungslink aus der
-   Registrierungs-E-Mail ins Leere — und zwar nur für echte Nutzer, während lokal alles
-   funktioniert.
-2. **Vercel → Settings → Functions.** Die Region muss `fra1` sein. `vercel.json` legt das fest;
+   erlaubten Weiterleitungen.
+
+   Das ist der teuerste Punkt auf dieser Liste, weil er **nicht scheitert, sondern schweigt.**
+   Nachgemessen am lokalen Stack, Ziel jeweils als `?redirect_to=`:
+
+   | angefordert                     | in der Mail      | HTTP |
+   | ------------------------------- | ---------------- | ---- |
+   | `…/auth/callback` (freigegeben) | dieselbe Adresse | 200  |
+   | `…/irgendwo-anders`             | **die Site URL** | 200  |
+   | `https://boese.example/abholen` | **die Site URL** | 200  |
+
+   Fehlt der Eintrag, ersetzt GoTrue das Ziel stillschweigend durch die Site URL. Der
+   Bestätigungscode landet dann auf der Startseite, wo ihn niemand einlöst, und verfällt — ohne
+   Fehlermeldung, an keiner Stelle. Die letzte Zeile zeigt zugleich, wozu die Liste da ist: Ohne
+   sie ließe sich ein Anmeldelink auf eine fremde Domain umbiegen.
+
+   `supabase/config.toml` hält dieselbe Liste für den lokalen Stack; das Dashboard liest sie
+   **nicht** von dort.
+
+2. **Supabase → Authentication → Emails → Confirm signup.** Betreff und Inhalt aus
+   `supabase/templates/confirmation.html` einfügen. Die gehostete Fassung liest keine Dateien aus
+   dem Repo — die Datei ist die Quelle, das Dashboard die Kopie. Ohne diesen Schritt verschickt
+   das Projekt die englische Standardvorlage von Supabase.
+
+3. **Das E-Mail-Kontingent kennen.** Der eingebaute Mailer im kostenlosen Tarif verschickt
+   **zwei Nachrichten pro Stunde, projektweit** — nicht pro Adresse. Gemessen: Nach zwei
+   Registrierungen war auch eine völlig unbekannte Adresse blockiert. Die Anwendung nennt das
+   inzwischen beim Namen (`src/lib/auth/messages.ts`), aber für eine Vorführung heißt es: nicht
+   kurz vorher testweise registrieren. Wer mehr braucht, hinterlegt eigenes SMTP; das ist bewusst
+   nicht eingerichtet.
+
+4. **Vercel → Settings → Functions.** Die Region muss `fra1` sein. `vercel.json` legt das fest;
    die Einstellung im Dashboard sollte damit übereinstimmen, sonst ist unklar, welche gilt.
 
 ## Die Datenbank wach halten
