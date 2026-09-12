@@ -12,6 +12,9 @@ import { z } from 'zod'
 import { PROVIDERS, providerOrDefault } from '@/lib/llm/registry'
 import { generateOverview } from '@/lib/studio/overview'
 import { createClient } from '@/lib/supabase/server'
+import { ZU_VIELE } from '@/lib/rate-limit/limits'
+import { verbrauche } from '@/lib/rate-limit/guard'
+import { LAUFENDE_AUDIO_ZUSTAENDE } from '@/lib/studio/status'
 
 /**
  * Skript und Vertonung zusammen dauern bei drei Minuten Audio rund
@@ -65,6 +68,44 @@ export async function POST(request: Request): Promise<Response> {
       },
       { status: 409 }
     )
+  }
+
+  // ── Läuft schon einer? Dann **ohne Verbrauch** abweisen ─────────────────
+  //
+  // Die erste Fassung drosselte ganz oben, vor allem anderen. Das war falsch,
+  // und das Review hat es gefunden: Eine Anfrage, während bereits ein Überblick
+  // läuft, endet weiter unten mit 409 — es beginnt keine neue Vertonung, aber
+  // das Kontingent war schon verbraucht. Bei sechs Stück pro Tag reichen zwei
+  // offene Tabs, um den Tag zu leeren, ohne dass eine einzige Datei entsteht.
+  //
+  // Deshalb zuerst nachsehen. Der Zustand kommt über den RLS-Client; ein
+  // fremdes Notebook hat die Prüfung oben schon abgefangen.
+  const { data: bestehend } = await supabase
+    .from('audio_overviews')
+    .select('status')
+    .eq('notebook_id', notebookId)
+    .maybeSingle<{ status: string }>()
+
+  if (bestehend && LAUFENDE_AUDIO_ZUSTAENDE.has(bestehend.status)) {
+    return Response.json({ message: 'Es läuft bereits einer.' }, { status: 409 })
+  }
+
+  // Jetzt erst zählen — hier beginnt mit hoher Wahrscheinlichkeit echte Arbeit.
+  //
+  // Der knappste Topf: Das Tageskontingent der Sprachausgabe zeigt sich erst
+  // als 429 vom Anbieter und ist dann für den Rest des Tages weg.
+  //
+  // **Was offen bleibt:** Zwischen dem Nachsehen oben und dem Zustandswechsel
+  // unten liegt ein Moment, in dem ein zweiter Aufruf dazwischengeraten kann.
+  // Dann verbrauchen beide, und nur einer bekommt den Lauf. Das ist ein
+  // verlorener Platz von sechs, in einem seltenen Zusammentreffen — die
+  // Korrektheit des Wechsels selbst trägt weiterhin die Policy, nicht dieser
+  // Code. Es vollständig zu schließen hieße, den ganzen Zustandsautomaten in
+  // eine Datenbankfunktion zu verlegen; das wäre viel Bewegung für einen
+  // Randfall, der nichts kaputtmacht, sondern nur etwas kostet.
+  const drossel = await verbrauche(supabase, 'audio')
+  if (!drossel.erlaubt) {
+    return Response.json({ message: drossel.message }, { status: ZU_VIELE })
   }
 
   // Anfordern heißt: die Zeile auf `pending` bringen — in genau drei Fällen,

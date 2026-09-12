@@ -5,6 +5,8 @@ import {
   createSourceInput,
   sourceInsertMessage
 } from '@/lib/sources/schema'
+import { verbrauche } from '@/lib/rate-limit/guard'
+import { ZU_VIELE } from '@/lib/rate-limit/limits'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -33,6 +35,21 @@ export async function POST(request: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
+
+  // Gedrosselt wird das **Anlegen**, nicht die Verarbeitung.
+  //
+  // Die Ingest-Route sieht von außen teurer aus — dort laufen Parser und
+  // Embeddings. Sie wird aber auch vom Client angestoßen, wenn der Reaper eine
+  // hängengebliebene Quelle zurückgesetzt hat, und eine Wiederaufnahme darf
+  // kein Kontingent kosten. Außerdem schützt dort bereits das Lease: Eine
+  // Quelle, die verarbeitet wird, lässt sich nicht ein zweites Mal übernehmen.
+  //
+  // Der Hebel ist deshalb hier. Wer keine Quelle anlegt, verarbeitet auch
+  // keine.
+  const drossel = await verbrauche(supabase, 'ingest')
+  if (!drossel.erlaubt) {
+    return NextResponse.json({ error: drossel.message }, { status: ZU_VIELE })
+  }
 
   let body: unknown
   try {
