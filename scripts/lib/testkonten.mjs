@@ -55,42 +55,61 @@ export async function raeumeTestkonten({ apiUrl, secretKey }) {
 
     // Erst die Dateien. Die Pfade beginnen mit der Nutzer-ID, ein Präfix
     // genügt also — und `list` ist nicht rekursiv, deshalb zwei Ebenen.
+    //
+    // **Wessen Dateien nicht weggehen, dessen Konto bleibt stehen.**
+    //
+    // Die erste Fassung verschluckte Fehler beim Auflisten und beim Löschen
+    // und entfernte das Konto trotzdem. Damit wäre die Nutzer-ID weg gewesen —
+    // und genau sie ist der erste Abschnitt jedes Pfades. Die Dateien wären
+    // unauffindbar geworden, ausgelöst vom Aufräumlauf selbst. Dieselbe Falle,
+    // gegen die diese Scheibe angetreten ist, nur eine Ebene höher.
+    //
+    // Ein stehengebliebenes Konto kostet dagegen nichts: Der nächste Lauf
+    // nimmt es wieder mit.
     const ids = new Set(weg.map((k) => k.id))
-    for (const bucket of ['sources', 'audio']) {
-      const pfade = []
-      for (const nutzer of ids) {
-        const oberste = await json(`${apiUrl}/storage/v1/object/list/${bucket}`, {
-          method: 'POST',
-          headers: { ...kopf, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prefix: nutzer, limit: 1000 })
-        }).catch(() => [])
+    const gestrandet = new Set()
 
-        for (const eintrag of oberste ?? []) {
-          if (eintrag.id) {
-            pfade.push(`${nutzer}/${eintrag.name}`)
-            continue
-          }
-          const tiefer = await json(`${apiUrl}/storage/v1/object/list/${bucket}`, {
+    for (const bucket of ['sources', 'audio']) {
+      for (const nutzer of ids) {
+        try {
+          const pfade = []
+          const oberste = await json(`${apiUrl}/storage/v1/object/list/${bucket}`, {
             method: 'POST',
             headers: { ...kopf, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prefix: `${nutzer}/${eintrag.name}`, limit: 1000 })
-          }).catch(() => [])
-          for (const datei of tiefer ?? []) pfade.push(`${nutzer}/${eintrag.name}/${datei.name}`)
-        }
-      }
+            body: JSON.stringify({ prefix: nutzer, limit: 1000 })
+          })
 
-      if (pfade.length > 0) {
-        await fetch(`${apiUrl}/storage/v1/object/${bucket}`, {
-          method: 'DELETE',
-          headers: { ...kopf, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prefixes: pfade })
-        }).catch(() => {})
+          for (const eintrag of oberste ?? []) {
+            if (eintrag.id) {
+              pfade.push(`${nutzer}/${eintrag.name}`)
+              continue
+            }
+            const tiefer = await json(`${apiUrl}/storage/v1/object/list/${bucket}`, {
+              method: 'POST',
+              headers: { ...kopf, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prefix: `${nutzer}/${eintrag.name}`, limit: 1000 })
+            })
+            for (const datei of tiefer ?? []) pfade.push(`${nutzer}/${eintrag.name}/${datei.name}`)
+          }
+
+          if (pfade.length > 0) {
+            await json(`${apiUrl}/storage/v1/object/${bucket}`, {
+              method: 'DELETE',
+              headers: { ...kopf, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prefixes: pfade })
+            })
+          }
+        } catch (fehler) {
+          gestrandet.add(nutzer)
+          console.warn(`  ${bucket}: Dateien von ${nutzer} bleiben liegen — ${fehler.message}`)
+        }
       }
     }
 
-    // Dann die Konten. Parallel, aber gedeckelt: Der lokale GoTrue ist kein
-    // Lastprüfstand, und tausend gleichzeitige Anfragen bringen ihm nichts.
-    const liste = [...ids]
+    // Dann die Konten — aber nur die, deren Dateien wirklich weg sind.
+    // Parallel, aber gedeckelt: Der lokale GoTrue ist kein Lastprüfstand, und
+    // tausend gleichzeitige Anfragen bringen ihm nichts.
+    const liste = [...ids].filter((id) => !gestrandet.has(id))
     const GLEICHZEITIG = 12
     for (let i = 0; i < liste.length; i += GLEICHZEITIG) {
       await Promise.all(
@@ -104,7 +123,14 @@ export async function raeumeTestkonten({ apiUrl, secretKey }) {
       )
     }
 
-    console.log(`\n  Aufgeräumt: ${weg.length} Testkonten samt ihrer Daten und Dateien.`)
+    console.log(`\n  Aufgeräumt: ${liste.length} Testkonten samt ihrer Daten und Dateien.`)
+    if (gestrandet.size > 0) {
+      console.warn(
+        `  ${gestrandet.size} Konten behalten, weil ihre Dateien nicht weggingen:\n` +
+          [...gestrandet].map((id) => `    ${id}`).join('\n') +
+          `\n  Der nächste Lauf versucht es erneut.`
+      )
+    }
   } catch (fehler) {
     console.warn('\n  Aufräumen der Testkonten übersprungen:', fehler.message)
   }
