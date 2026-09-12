@@ -29,6 +29,27 @@ dasselbe für Quellen und Abschnitte.
 
 **Fehlender Zugriff ergibt 404, nie 403.** Ein 403 bestätigt, dass die Ressource existiert.
 
+### Die Route mit dem größten Hebel
+
+`GET /api/sources/[sourceId]/text` liefert den **vollständigen** Inhalt einer Quelle — sie ist
+damit der Endpunkt, bei dem eine fehlende Prüfung am teuersten wäre. Alles andere gibt Metadaten
+oder Ausschnitte heraus; hier ginge das ganze Dokument.
+
+Sie ist deshalb doppelt abgesichert und beides ist geprüft: Die Abfrage läuft über den
+RLS-Client, und `e2e/b2-upload-ingest.spec.ts` spricht sie mit dem gültigen Token eines zweiten
+Nutzers an und erwartet **404**.
+
+### Löschen räumt auch auf, was man nicht sieht
+
+Wird eine Quelle entfernt, gehen ihre Abschnitte per `on delete cascade` mit, die Datei im
+Storage dagegen nicht — die muss die Anwendung selbst entfernen. Eine liegengebliebene Datei
+wäre kein Datenleck (die Storage-Policy schützt sie weiter), aber sie zählte unsichtbar gegen
+das Speicherkontingent.
+
+`e2e/b6-source-text.spec.ts` prüft das **mit dem Secret Key**, nicht mit dem Token des Nutzers:
+Eine Policy, die die Datei bloß verbirgt, sähe sonst genauso aus wie eine gelöschte, und der
+Test wäre grün, während der Speicher vollläuft.
+
 ## Der Schlüssel, der alles darf
 
 `SUPABASE_SECRET_KEY` umgeht RLS vollständig. Er lebt an genau einer Stelle

@@ -226,6 +226,7 @@ main { padding: 32px 28px 120px; max-width: 1560px; margin: 0 auto; }
     <a href="#b4">Quellen</a><a href="#b5">Chat</a><a href="#b6">Studio</a>
     <a href="#b7">Datenfluss</a><a href="#b8">Desktop</a><a href="#b9">Tablet</a>
     <a href="#b10">Mobile</a><a href="#b11">Landing</a><a href="#b12">Zustände</a>
+    <a href="#b13">Quellenbetrachter</a>
   </nav>
   <span class="spacer"></span>
   <div class="modeToggle" role="group" aria-label="Theme">
@@ -861,6 +862,50 @@ main { padding: 32px 28px 120px; max-width: 1560px; margin: 0 auto; }
     </div>
   </div>
 </section>
+
+<!-- ══ 13 QUELLENBETRACHTER ═══════════════════════════════════════════════ -->
+<section class="board" id="b13">
+  <header>
+    <span class="num">13</span>
+    <h2>Quellenbetrachter — der Klick auf ein Zitat</h2>
+    <p class="why">Das Versprechen aus <code>README.md</code>: Ein Klick öffnet die Quelle an der Stelle, aus der
+      die Antwort stammt. Gezeigt wird <b>der extrahierte Text, nicht das Originallayout</b> — genau das, was das
+      Modell gesehen hat. Ein PDF daneben zu stellen hieße, zwei Wahrheiten zu zeigen, und die Frage „warum steht
+      in der Antwort etwas anderes" hätte keine gute Antwort.</p>
+    <p class="why">Die Markierung ist Gold — und zwar <b>keine neue Stelle</b>: Sie ist dasselbe „aktive
+      Zitat-Highlight" wie der Chip, aus dem sie aufgerufen wurde, nur an seinem Ziel. Der Nutzer soll sehen,
+      dass Chip und markierte Passage dieselbe Sache sind. Die Gold-Disziplin in <code>CLAUDE.md</code> bleibt
+      damit bei vier Stellen.</p>
+  </header>
+  <div class="art pad" style="background:rgba(0,0,0,.45)">
+    <div class="n-card" style="max-width:640px;margin:0 auto;padding:0;overflow:hidden">
+
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:12px;
+                  padding:16px 18px;border-bottom:1px solid var(--hairline)">
+        <div>
+          <p class="n-h3">Quartalsbericht Q3.pdf</p>
+          <p class="n-small">PDF · Seite 17 von 42</p>
+        </div>
+        <button class="n-btn n-btn--secondary" style="padding:7px 12px;font-size:13px">Schließen</button>
+      </div>
+
+      <div style="padding:18px;max-height:300px;overflow:auto">
+        <p class="n-small" style="margin-bottom:8px">Seite 17</p>
+        <p class="n-body" style="font-size:14px;line-height:1.7">
+          Die Umsätze im Juli und August lagen leicht unter dem Durchschnitt der Vormonate, stabilisierten sich
+          im September jedoch wieder.
+          <mark style="background:var(--accent);color:var(--on-accent);border-radius:4px;padding:1px 2px">Dank einer
+          optimierten Lieferkette konnten wir die Materialkosten um 3 % senken, was zu einer Verbesserung der
+          Bruttomarge führte.</mark>
+          Der Cashflow aus der Geschäftstätigkeit entwickelte sich hervorragend, wodurch wir offene
+          Verbindlichkeiten vorzeitig tilgen konnten.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 
 </main>
 

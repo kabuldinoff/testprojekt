@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react'
 
+import { SourceViewer } from '@/components/sources/source-viewer'
 import { rewriteMarkers, splitAnswer } from '@/lib/chat/citations'
 import type { StreamedSource } from '@/lib/chat/ui'
 
@@ -26,6 +27,12 @@ export function Answer({ text, sources }: { text: string; sources: StreamedSourc
   // Welcher Beleg gerade geöffnet ist. Nur einer, weil zwei gleichzeitig
   // geöffnete Passagen die Antwort auseinanderreißen würden.
   const [offen, setOffen] = useState<number | null>(null)
+
+  // Welcher Beleg im Dokument nachgeschlagen wird. Getrennt von `offen`, weil
+  // der aufgeklappte Ausschnitt sichtbar bleiben soll, während der Dialog
+  // darüber steht — beim Schließen steht der Nutzer wieder dort, wo er war.
+  const [imDokument, setImDokument] = useState<StreamedSource | null>(null)
+
   const panelId = useId()
 
   // Erfundene Nummern fliegen raus, bevor gerendert wird — nach derselben
@@ -70,7 +77,33 @@ export function Answer({ text, sources }: { text: string; sources: StreamedSourc
           <blockquote className="mt-2 text-sm leading-relaxed text-ink">
             {gezeigt.excerpt}
           </blockquote>
+
+          {/*
+            Der zweite Schritt des Versprechens aus README.md: erst die Passage
+            im Wortlaut, dann sie an ihrer Stelle im Dokument.
+ 
+            Warum nicht gleich der Dialog beim Klick auf den Chip: Die häufige
+            Frage ist „worauf stützt sich das?", und die beantwortet der
+            Ausschnitt an Ort und Stelle, ohne den Lesefluss zu unterbrechen.
+            Die seltenere ist „was steht drumherum?" — die verdient den ganzen
+            Text, und dafür lohnt sich ein Dialog.
+          */}
+          <button
+            type="button"
+            onClick={() => setImDokument(gezeigt)}
+            className="mt-3 rounded-control text-xs font-semibold text-brand-600 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          >
+            Im Dokument anzeigen
+          </button>
         </figure>
+      ) : null}
+
+      {imDokument ? (
+        <SourceViewer
+          sourceId={imDokument.sourceId}
+          chunkIndex={imDokument.chunkIndex}
+          onClose={() => setImDokument(null)}
+        />
       ) : null}
     </div>
   )

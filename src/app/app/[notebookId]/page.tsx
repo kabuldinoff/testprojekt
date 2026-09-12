@@ -223,7 +223,7 @@ export default async function NotebookPage({ params }: PageProps<'/app/[notebook
               Die Quellen konnten nicht geladen werden. Bitte die Seite neu laden.
             </p>
           ) : (
-            <SourceList sources={sources} />
+            <SourceList notebookId={notebook.id} sources={sources} />
           )}
 
           <div className="mt-4">
