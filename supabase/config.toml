@@ -169,7 +169,34 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+#
+# Hier steht die Callback-Route, und das ist keine Formalie: Ist ein Ziel nicht
+# freigegeben, **ersetzt GoTrue es stillschweigend durch site_url** — kein
+# Fehler, kein Hinweis, die Anfrage antwortet mit 200.
+#
+# Nachgemessen am laufenden Stack, Ziel jeweils als `?redirect_to=`:
+#
+#   http://localhost:3000/auth/callback  → in der Mail: dieselbe Adresse
+#   http://localhost:3000/irgendwo-anders → in der Mail: http://127.0.0.1:3000
+#   https://boese.example/abholen         → in der Mail: http://127.0.0.1:3000
+#
+# Die letzte Zeile zeigt, wozu die Liste da ist: Ohne sie ließe sich ein
+# Anmeldelink auf eine fremde Domain umbiegen. Die mittlere zeigt, was es
+# kostet, sie zu vergessen — der Code landet auf einer Seite, die ihn nicht
+# einlöst, und verfällt.
+#
+# Beide Schreibweisen, weil `pnpm dev:local` auf `localhost` läuft und
+# `site_url` auf `127.0.0.1` zeigt — für GoTrue sind das zwei verschiedene
+# Hosts. Port 3100 ist der Produktionsbau, gegen den Playwright läuft.
+#
+# Dieselbe Liste muss im Dashboard des Produktionsprojekts stehen; sie ist dort
+# nicht aus dieser Datei ableitbar. Siehe docs/deployment.md.
+additional_redirect_urls = [
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3000/auth/callback",
+  "http://127.0.0.1:3100/auth/callback",
+  "http://localhost:3100/auth/callback"
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -232,6 +259,22 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
+#
+# **Hier weicht lokal bewusst von Produktion ab, und das kostet etwas.**
+#
+# Steht das auf `true`, liefert eine Registrierung keine Sitzung mehr, und
+# sämtliche End-to-End-Tests bräuchten einen Umweg über die Admin-API — sie
+# legen Konten an und arbeiten sofort damit weiter. Der Preis dafür wäre höher
+# als der Gewinn.
+#
+# Der Preis **dieser** Einstellung ist dagegen konkret: Der Bestätigungsweg
+# existiert lokal gar nicht, und genau darin steckte ein Fehler, den erst
+# Produktion gezeigt hat — `signUp` nannte kein `emailRedirectTo`, der Code
+# landete auf der Startseite und verfiel. Deshalb prüft
+# `src/lib/__tests__/auth-signup-redirect.test.ts` beobachtend, womit die
+# Action den Auth-Server aufruft, und `docs/testplan.md` führt den Weg als
+# manuellen Punkt. Zum Ansehen der Vorlage lässt sich das hier kurz auf `true`
+# stellen; der lokale Postausgang liegt unter http://127.0.0.1:54424.
 enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
@@ -251,6 +294,17 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Die Vorlage liegt als Datei im Repo, nicht nur im Dashboard.
+#
+# Was ausschließlich im Dashboard steht, steht nirgends: Es taucht in keinem
+# Diff auf, niemand reviewt es, und niemand merkt, wenn es sich ändert. Hier
+# liest der lokale Stack sie direkt; ins Produktionsprojekt kommt sie per
+# Copy-and-paste, weil die gehostete Fassung keine Repo-Dateien liest. Der
+# Handgriff steht in docs/deployment.md.
+[auth.email.template.confirmation]
+subject = "Bestätige deine Adresse für Notabene"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
