@@ -109,7 +109,7 @@ Loopback-Adressen zu und wirft sonst; siehe ADR 0006.
 
 ## Was außerhalb dieses Repos eingestellt werden muss
 
-Vier Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig vergessen:
+Fünf Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig vergessen:
 
 1. **Supabase → Authentication → URL Configuration.** Die _Site URL_ muss auf die
    Produktionsadresse zeigen, und `https://<domain>/auth/callback` gehört in die Liste der
@@ -132,19 +132,49 @@ Vier Dinge stehen nicht im Code und werden beim ersten Ausrollen regelmäßig ve
    `supabase/config.toml` hält dieselbe Liste für den lokalen Stack; das Dashboard liest sie
    **nicht** von dort.
 
-2. **Supabase → Authentication → Emails → Confirm signup.** Betreff und Inhalt aus
-   `supabase/templates/confirmation.html` einfügen. Die gehostete Fassung liest keine Dateien aus
-   dem Repo — die Datei ist die Quelle, das Dashboard die Kopie. Ohne diesen Schritt verschickt
-   das Projekt die englische Standardvorlage von Supabase.
+2. **Supabase → Authentication → Sign In / Providers → „Confirm email" ist in dieser
+   Installation ABGESCHALTET.** Das ist eine bewusste Entscheidung und kein vergessener Schalter;
+   die Begründung steht unten.
 
-3. **Das E-Mail-Kontingent kennen.** Der eingebaute Mailer im kostenlosen Tarif verschickt
-   **zwei Nachrichten pro Stunde, projektweit** — nicht pro Adresse. Gemessen: Nach zwei
-   Registrierungen war auch eine völlig unbekannte Adresse blockiert. Die Anwendung nennt das
-   inzwischen beim Namen (`src/lib/auth/messages.ts`), aber für eine Vorführung heißt es: nicht
-   kurz vorher testweise registrieren. Wer mehr braucht, hinterlegt eigenes SMTP; das ist bewusst
-   nicht eingerichtet.
+3. **Die Grenzen des eingebauten Mailers kennen — sie sind der Grund für Punkt 2.**
 
-4. **Vercel → Settings → Functions.** Die Region muss `fra1` sein. `vercel.json` legt das fest;
+   |            |                                                              |
+   | ---------- | ------------------------------------------------------------ |
+   | Zustellung | **nur an Adressen, die Mitglied des Supabase-Projekts sind** |
+   | Menge      | zwei Nachrichten pro Stunde, projektweit — nicht pro Adresse |
+
+   Die erste Zeile ist die härtere und stand lange unbemerkt im Weg: Die eigene Registrierung
+   funktionierte, weil die eigene Adresse das Projekt angelegt hat. Eine fremde Adresse hätte nie
+   etwas bekommen — die Registrierung sähe erfolgreich aus, und die Mail käme nicht. Für ein
+   Produkt, das jemand ausprobieren soll, ist das kein Randfall, sondern der Normalfall.
+
+   Die zweite ist gemessen: Nach zwei Registrierungen war auch eine völlig unbekannte Adresse
+   blockiert.
+
+   Beides verschwindet mit eigenem SMTP. Das ist hier bewusst nicht eingerichtet — die
+   naheliegenden Anbieter verlangen eine **verifizierte eigene Domain** („You must add and verify
+   at least one domain to send emails with Resend"), und die gibt es für dieses Projekt nicht;
+   `*.vercel.app` gehört Vercel. Ein Anbieter ohne Domain-Prüfung wäre möglich, liefert aber ohne
+   SPF und DKIM in den Spam-Ordner — und eine Bestätigungsmail, die im Spam landet, ist schlechter
+   als gar keine, weil niemand sie sucht.
+
+   **Daraus folgt die Einstellung aus Punkt 2.** Ohne Bestätigung bekommt jeder sofort eine
+   Sitzung und ist im Arbeitsbereich; es wird keine Mail verschickt, und keine der beiden Grenzen
+   greift. Nachgemessen mit einer garantiert nicht existierenden Adresse auf `.invalid`: Sitzung
+   sofort, Konto als bestätigt markiert.
+
+   Der Code kann **beides**. `signUp` setzt `emailRedirectTo` auf `/auth/callback`, und der
+   Zweig für „Nutzer ohne Sitzung" ist gebaut und getestet — wird die Bestätigung eingeschaltet,
+   funktioniert der Weg ohne weitere Änderung. Die Vorlage dafür liegt als
+   `supabase/templates/confirmation.html` im Repo; einfügen lässt sie sich im Dashboard erst mit
+   eigenem SMTP.
+
+4. **Wenn eigenes SMTP dazukommt**, sind es drei Schritte und einer davon wird übersehen:
+   SMTP-Zugangsdaten unter _Project Settings → Authentication → SMTP Settings_, dann
+   **Authentication → Rate Limits → „Emails per hour"** von 2 hochsetzen — die Grenze hängt
+   **nicht** am SMTP-Anbieter —, und erst dann die Vorlage einfügen.
+
+5. **Vercel → Settings → Functions.** Die Region muss `fra1` sein. `vercel.json` legt das fest;
    die Einstellung im Dashboard sollte damit übereinstimmen, sonst ist unklar, welche gilt.
 
 ## Die Datenbank wach halten
