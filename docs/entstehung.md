@@ -15,9 +15,9 @@ Drei Entscheidungen prägen die Reihenfolge, und sie sind an ihr ablesbar:
 - **Tests gehören in dieselbe Scheibe wie die Funktion**, nie in eine spätere. Eine Scheibe
   ist fertig, wenn sie beweisbar ist — nicht, wenn sie läuft.
 
-Gearbeitet wurde in Scheiben: ein Branch, ein Pull Request, ein Thema. Jeder Pull Request wurde
-automatisch reviewt, bevor er gemergt wurde; die Befunde stehen als Kommentare in den Threads,
-zusammen mit der Antwort darauf — übernommen oder mit Begründung abgelehnt.
+Gearbeitet wurde in Scheiben: ein Branch, ein Pull Request, ein Thema. Jeder Pull Request ging
+vor dem Merge durch ein Review; die Befunde stehen als Kommentare in den Threads, zusammen mit
+der Antwort darauf — übernommen oder mit Begründung abgelehnt.
 
 ## Die Scheiben
 
