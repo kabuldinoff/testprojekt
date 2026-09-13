@@ -90,27 +90,41 @@ sonst:
 16. Eine zweite Quelle hinzufügen, neu erzeugen: Kommt sie im Gespräch vor? (Der Quelltext wird
     gleichmäßig auf die Quellen verteilt, damit ein großes Dokument die kleinen nicht verdrängt.)
 
-**Registrierung mit Bestätigung** — der Weg, den die Automatisierung **nicht** abdecken kann:
+**Registrierung** — der Weg, den die Automatisierung **nicht** abdecken kann:
 
-Lokal steht `enable_confirmations = false` (`supabase/config.toml`, mit Begründung dort). Eine
-Registrierung liefert dort sofort eine Sitzung, es wird keine E-Mail verschickt, und der
-Bestätigungsweg existiert schlicht nicht. Genau darin steckte ein Fehler, den erst Produktion
-gezeigt hat: `signUp` nannte kein `emailRedirectTo`, der Code landete auf der Startseite und
-verfiel. `src/lib/__tests__/auth-signup-redirect.test.ts` beobachtet seitdem, **womit** die
-Action aufruft — dass die Gegenseite es akzeptiert, kann nur dieser Punkt hier zeigen.
+Diese Installation läuft **ohne E-Mail-Bestätigung**, lokal wie in Produktion. Eine
+Registrierung liefert sofort eine Sitzung; es wird keine Nachricht verschickt, und einen
+Bestätigungsweg gibt es nicht.
 
-17. **Gegen Produktion** mit einer echten, noch nicht registrierten Adresse anmelden. Kommt die
-    Mail, und trägt sie die eigene Vorlage — deutsches „Nur noch ein Klick", das N-Zeichen, der
-    blaue Knopf — statt der englischen Standardvorlage von Supabase?
-18. Den Knopf anklicken. Landet man **direkt im Arbeitsbereich** und nicht auf der Startseite
-    oder der Anmeldeseite? Steht in der Adresszeile `/app` und kein `?code=`?
-19. Denselben Link ein zweites Mal öffnen: erscheint die Anmeldeseite mit einem Hinweis statt
-    einer Fehlerseite?
-20. Die Erfolgsmeldung nach dem Absenden nennt die eingegebene Adresse — stimmt sie mit dem
-    überein, was im Postfach ankommt?
-21. Zweimal hintereinander mit **verschiedenen** neuen Adressen registrieren. Die dritte muss
-    „das Kontingent ist für diese Stunde erschöpft" melden und nicht „Registrierung nicht
-    möglich": Der eingebaute Mailer verschickt zwei Nachrichten pro Stunde, projektweit.
-    ⚠️ Dieser Punkt verbraucht das Kontingent — nicht am Tag der Vorführung ausführen.
+Das ist keine Bequemlichkeit, sondern die Folge einer gemessenen Grenze: Der eingebaute Mailer
+von Supabase stellt im kostenlosen Tarif **nur an Mitglieder des Projektteams** zu und deckelt
+bei zwei Nachrichten pro Stunde, projektweit. Ein Bestätigungsweg, der bei jedem fremden
+Besucher stumm ins Leere läuft, ist schlechter als gar keiner — der Besucher wartet dann auf
+eine Mail, die nie kommt, und hält die Anwendung für kaputt. Ein eigener Versand bräuchte eine
+Domain; die gibt es hier nicht.
+
+Der Preis steht hier, nicht daneben: **Jede erfundene Adresse legt ein Konto an.** Es gibt
+keine Prüfung, dass ein Postfach existiert. Für eine Vorführung ist das richtig herum
+abgewogen, für einen Dauerbetrieb nicht.
+
+Was davon bleibt: `signUp` nennt weiterhin ein `emailRedirectTo`. Das war einmal der Fehler,
+den erst Produktion gezeigt hat — der Code landete auf der Startseite und verfiel, weil das
+Ziel nicht freigeschaltet war, und die Gegenseite meldete das mit **HTTP 200 und ohne
+Fehlertext**. `src/lib/__tests__/auth-signup-redirect.test.ts` beobachtet seitdem, **womit**
+die Action aufruft. Wird die Bestätigung je wieder eingeschaltet, ist der Weg damit schon
+richtig verdrahtet — dass die Gegenseite ihn akzeptiert, kann aber nur Punkt 19 zeigen.
+
+17. **Gegen Produktion** mit einer erfundenen, noch nicht vergebenen Adresse registrieren.
+    Landet man **direkt im Arbeitsbereich**, ohne Zwischenseite und ohne Hinweis auf eine
+    Mail? Steht in der Adresszeile `/app` und kein `?code=`?
+18. Dieselbe Adresse ein zweites Mal registrieren. Kommt die Meldung, dass sich damit gerade
+    kein Konto anlegen lässt, **ohne die Adresse zu wiederholen**? Sie darf nicht bestätigen,
+    dass genau dieses Konto existiert — das wäre eine Auskunft über einen fremden Nutzer.
+19. Nur falls die Bestätigung wieder eingeschaltet wird: Die Callback-Adresse muss in der
+    Freigabeliste des Auth-Servers stehen. Fehlt sie, wird sie **still** durch die Site-URL
+    ersetzt — HTTP 200, keine Fehlermeldung, und der Code verfällt ungenutzt.
+20. Abmelden, mit demselben Konto wieder anmelden: Ist das Notebook von vorhin noch da?
+21. Mit einem zweiten Konto die Notebook-Adresse des ersten direkt aufrufen → **404**,
+    nicht 403. Ein 403 würde bestätigen, dass es die Ressource gibt.
 
 Die übrigen produktbezogenen Punkte kommen mit den jeweiligen Scheiben hinzu.
