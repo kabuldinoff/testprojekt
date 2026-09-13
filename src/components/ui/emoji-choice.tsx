@@ -40,11 +40,26 @@ import { useId } from 'react'
  * kleiner Fläche unterscheiden lassen. Bewusst keine Gesichter: Ein Notebook
  * ist eine Sache, keine Stimmung.
  */
-const SYMBOLE = ['📊', '📈', '📄', '📚', '🗂️', '🔬', '🧭', '💡'] as const
+const SYMBOLE: readonly string[] = ['📊', '📈', '📄', '📚', '🗂️', '🔬', '🧭', '💡']
 
 export function EmojiChoice({ defaultValue }: { defaultValue?: string | null }) {
   const name = useId()
   const gewaehlt = defaultValue ?? ''
+
+  /**
+   * Ein gespeichertes Symbol, das nicht in der Auswahl steht.
+   *
+   * **Ohne diesen Zweig wäre die Auswahl ein Datenverlust.** Vor ihr war das
+   * Feld ein Textfeld und nahm jedes Emoji an; die Spalte lässt bis zu acht
+   * Code Points zu, und solche Werte stehen in der Datenbank. Ist keiner der
+   * Knöpfe gewählt, schickt der Browser das Feld **gar nicht** — und aus einem
+   * fehlenden Feld wird hier `null`. Das Symbol wäre weg, sobald jemand die
+   * Einstellungen öffnet und speichert, ohne es anzufassen. Nachgemessen.
+   *
+   * Es steht deshalb als zusätzliche, vorausgewählte Möglichkeit da. Wer es
+   * behalten will, tut nichts; wer es loswerden will, wählt „ohne".
+   */
+  const eigenes = gewaehlt.length > 0 && !SYMBOLE.includes(gewaehlt) ? gewaehlt : null
 
   return (
     <fieldset>
@@ -68,6 +83,14 @@ export function EmojiChoice({ defaultValue }: { defaultValue?: string | null }) 
             ohne
           </span>
         </Wahl>
+
+        {eigenes ? (
+          <Wahl name={name} wert={eigenes} gewaehlt={gewaehlt} label={`${eigenes} (eigenes)`}>
+            <span aria-hidden className="text-lg leading-none">
+              {eigenes}
+            </span>
+          </Wahl>
+        ) : null}
 
         {SYMBOLE.map((symbol) => (
           <Wahl key={symbol} name={name} wert={symbol} gewaehlt={gewaehlt} label={symbol}>

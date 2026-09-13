@@ -17,26 +17,31 @@ import { useId, useState, type ChangeEvent, type ComponentProps, type Ref } from
  * kommt CSS nicht heran; er ist Teil des Shadow-DOM und in keinem Browser
  * ansprechbar. Die einzige Lösung ist, ihn gar nicht erst zu zeigen.
  *
- * ── Wie das hier funktioniert ────────────────────────────────────────────
- *
- * Das echte Feld bleibt im Formular und behält seinen Namen, seine
- * Validierung und seinen `accept`-Filter — es wird nur unsichtbar. Sichtbar
- * sind ein `<label>`, das wie ein Knopf aussieht, und unser eigener Text.
- *
- * `sr-only` statt `display: none` oder `hidden`: Ein verstecktes Feld ist
- * nicht fokussierbar, und damit wäre das Formular mit der Tastatur nicht mehr
- * bedienbar. So bleibt es in der Tabulatorreihenfolge, und `focus-within` am
- * Label zeigt den Fokus dort, wo der Nutzer hinschaut.
+ * `sr-only` statt `display: none` oder `hidden`: Ein verstecktes Feld ist nicht
+ * fokussierbar, und damit wäre das Formular mit der Tastatur nicht mehr
+ * bedienbar. `focus-within` am Label zeigt den Fokus dann dort, wo der Nutzer
+ * hinschaut — am Knopf und nicht an einem unsichtbaren Punkt daneben.
  */
 export function FileField({
   label,
   hint,
+  error,
   inputRef,
   onChange,
   ...props
 }: Omit<ComponentProps<'input'>, 'type' | 'className' | 'ref'> & {
   label: string
   hint?: string
+  /**
+   * Die Fehlermeldung, falls eine ansteht.
+   *
+   * Sie wird hier **nicht angezeigt** — das tut der Aufrufer über `Notice`,
+   * damit alle Fehler des Formulars an einer Stelle stehen. Gebraucht wird sie
+   * für die Verknüpfung: `aria-describedby` und `aria-invalid`. Ohne die liest
+   * ein Screenreader das Feld als in Ordnung vor, während darüber „Bitte eine
+   * Datei auswählen" steht.
+   */
+  error?: string | undefined
   inputRef?: Ref<HTMLInputElement>
 }) {
   const id = useId()
@@ -60,7 +65,16 @@ export function FileField({
             type="file"
             ref={inputRef}
             aria-labelledby={`${id}-label`}
-            aria-describedby={hint ? hintId : undefined}
+            aria-invalid={error ? true : undefined}
+            // Hinweis und Fehler zusammen, in dieser Reihenfolge: Ein
+            // Screenreader liest sie beim Betreten des Feldes hintereinander
+            // vor, und was gerade schiefging, gehört ans Ende.
+            aria-describedby={
+              [error ? `${id}-fehler` : null, hint ? hintId : null]
+                .filter(Boolean)
+                .join(' ')
+                .trim() || undefined
+            }
             className="sr-only"
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setDateiname(event.target.files?.[0]?.name ?? null)
@@ -90,6 +104,19 @@ export function FileField({
         <p id={hintId} className="text-xs text-faint-ink">
           {hint}
         </p>
+      ) : null}
+
+      {/*
+        Der Fehlertext steht beim Aufrufer, damit das Formular eine einzige
+        Fehlerstelle hat. Hier steht er nur noch einmal für Screenreader, an
+        das Feld gebunden — sichtbar ist er nicht, doppelt vorgelesen wird er
+        deshalb auch nicht: `Notice` trägt `role="alert"` und wird beim
+        Erscheinen angesagt, dieser Text beim Betreten des Feldes.
+      */}
+      {error ? (
+        <span id={`${id}-fehler`} className="sr-only">
+          {error}
+        </span>
       ) : null}
     </div>
   )
