@@ -41,22 +41,31 @@ export const notebookInput = z.object({
     .min(1, 'Bitte einen Titel angeben.')
     .max(TITLE_MAX, `Höchstens ${TITLE_MAX} Zeichen.`),
 
-  // Leere Eingaben werden zu undefined statt zu "": eine leere Zeichenkette in
-  // der Datenbank sähe wie eine gesetzte Beschreibung aus und würde im UI eine
-  // leere Zeile erzeugen, statt den Platz gar nicht einzunehmen.
+  // ── Leer wird `null`, nicht `undefined` ──────────────────────────────────
+  //
+  // Eine leere Zeichenkette käme nicht in Frage: In der Datenbank sähe `''`
+  // wie eine gesetzte Beschreibung aus und erzeugte im UI eine leere Zeile,
+  // statt den Platz gar nicht einzunehmen.
+  //
+  // `undefined` stand hier zuerst und war beim **Anlegen** richtig und beim
+  // **Ändern** ein stiller Fehler: `JSON.stringify({ emoji: undefined })`
+  // ergibt `{}`. Die Spalte steht dann gar nicht im Rumpf, PostgREST lässt sie
+  // unverändert — und wer sein Symbol wieder loswerden wollte, bekam den alten
+  // Wert zurück, ohne Fehlermeldung. Dasselbe galt für die Beschreibung.
+  //
+  // `null` bedeutet für beide Wege dasselbe: „dieses Feld ist leer". Beim
+  // Einfügen wie beim Ändern.
   description: z
     .string()
     .trim()
     .max(DESCRIPTION_MAX, `Höchstens ${DESCRIPTION_MAX} Zeichen.`)
-    .optional()
-    .transform((v) => (v ? v : undefined)),
+    .transform((v) => (v.length > 0 ? v : null)),
 
   emoji: z
     .string()
     .trim()
     .refine((v) => codePoints(v) <= EMOJI_MAX, 'Bitte ein einzelnes Zeichen.')
-    .optional()
-    .transform((v) => (v ? v : undefined))
+    .transform((v) => (v.length > 0 ? v : null))
 })
 
 export type NotebookInput = z.infer<typeof notebookInput>

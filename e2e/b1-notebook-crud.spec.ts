@@ -33,9 +33,16 @@ async function oeffneEinstellungen(page: Page) {
   // 1280px zu Recht unsichtbar, und `waitFor()` darauf lief in eine
   // Zeitüberschreitung — auf genau der Breite, mit der die Tests laufen.
   await page.getByRole('region', { name: 'Quellen' }).waitFor()
-  const zusammenfassung = page.getByText('Einstellungen', { exact: true })
-  await zusammenfassung.click()
-  await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible()
+
+  // Erst nachsehen, dann klicken: `<summary>` **schaltet um**. Ein zweiter
+  // Aufruf in derselben Ansicht klappte den Abschnitt wieder zu, und der Test
+  // scheiterte an einem Knopf, der eben noch da war. Aufgefallen, als ein Test
+  // zweimal in die Einstellungen musste — setzen und wieder entfernen.
+  const speichern = page.getByRole('button', { name: 'Speichern' })
+  if (!(await speichern.isVisible())) {
+    await page.getByText('Einstellungen', { exact: true }).click()
+  }
+  await expect(speichern).toBeVisible()
 }
 
 test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
@@ -128,6 +135,69 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app$/)
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
+})
+
+test('ein gesetztes Symbol lässt sich wieder entfernen', async ({ page }) => {
+  // Der gemeldete Fehler, und er betraf zwei Felder: Leere Eingaben wurden zu
+  // `undefined`, und `JSON.stringify({ emoji: undefined })` ergibt `{}`. Die
+  // Spalte stand dann gar nicht im Rumpf, PostgREST ließ sie unverändert — das
+  // Symbol blieb, was es war, ohne Fehlermeldung.
+  //
+  // Beim Anlegen fiel es nicht auf: Dort ist „nichts gesetzt" das Ergebnis,
+  // das man ohnehin bekommt.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Ohne Symbol gestartet')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+
+  const ueberschrift = page.getByRole('heading', { level: 1 })
+  await expect(ueberschrift).not.toContainText('📈')
+
+  // Setzen — das ging schon vorher.
+  await oeffneEinstellungen(page)
+  await page.getByRole('radio', { name: '📈' }).check()
+  await page.getByRole('button', { name: 'Speichern' }).click()
+  await expect(ueberschrift).toContainText('📈')
+
+  // Und wieder weg. Das ist die Zusicherung.
+  await oeffneEinstellungen(page)
+  await page.getByRole('radio', { name: 'Ohne Symbol' }).check()
+  await page.getByRole('button', { name: 'Speichern' }).click()
+  await expect(ueberschrift).not.toContainText('📈')
+
+  // Nach dem Neuladen immer noch weg — sonst hätte nur die Anzeige vergessen,
+  // was in der Datenbank noch steht.
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).not.toContainText('📈')
+})
+
+test('eine gesetzte Beschreibung lässt sich wieder leeren', async ({ page }) => {
+  // Dasselbe Feld-Verhalten, andere Spalte. Ohne diesen Test wäre die Hälfte
+  // des Fehlers ungeprüft geblieben — gemeldet wurde nur das Symbol.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Mit Beschreibung')
+  await page.getByLabel(/Beschreibung/).fill('Vorläufiger Text')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+
+  const ueberschrift = page.getByRole('heading', { level: 1 })
+  await expect(ueberschrift).toHaveAccessibleDescription('Vorläufiger Text')
+
+  await oeffneEinstellungen(page)
+  await page.getByLabel(/Beschreibung/).fill('')
+  await page.getByRole('button', { name: 'Speichern' }).click()
+
+  // Erst auf die neu gerenderte Seite warten, dann neu laden. Andersherum
+  // lädt der Test die Seite, während die Server Action noch läuft, und liest
+  // den alten Stand — grün oder rot dann vom Zufall abhängig.
+  await expect(ueberschrift).not.toHaveAccessibleDescription('Vorläufiger Text')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveAccessibleDescription(
+    'Vorläufiger Text'
+  )
 })
 
 test('mit dem Notebook verschwinden auch seine Dateien', async ({ page, playwright }) => {

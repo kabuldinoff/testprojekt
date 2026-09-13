@@ -25,15 +25,33 @@ function form(fields: Record<string, string>): FormData {
 }
 
 describe('parseNotebookForm', () => {
-  it('nimmt einen Titel und macht aus leeren Feldern undefined', () => {
+  it('nimmt einen Titel und macht aus leeren Feldern null', () => {
     const r = parseNotebookForm(form({ title: 'Quartalsanalyse', description: '', emoji: '' }))
     expect(r.success).toBe(true)
     if (!r.success) return
     expect(r.data.title).toBe('Quartalsanalyse')
     // Nicht '' — eine leere Zeichenkette sähe in der Datenbank wie eine
     // gesetzte Beschreibung aus und erzeugte im UI eine leere Zeile.
-    expect(r.data.description).toBeUndefined()
-    expect(r.data.emoji).toBeUndefined()
+    expect(r.data.description).toBeNull()
+    expect(r.data.emoji).toBeNull()
+  })
+
+  it('und **nicht** undefined — das ist der Unterschied beim Ändern', () => {
+    // `JSON.stringify({ emoji: undefined })` ergibt `{}`. Die Spalte stünde
+    // dann gar nicht im Rumpf, PostgREST ließe sie unverändert, und wer sein
+    // Symbol wieder loswerden wollte, bekäme den alten Wert zurück — ohne
+    // Fehlermeldung. Genau so ist es gemeldet worden.
+    //
+    // Geprüft wird deshalb, was tatsächlich über die Leitung geht, und nicht
+    // nur der Wert im Objekt.
+    const r = parseNotebookForm(form({ title: 'Analyse', description: '', emoji: '' }))
+    expect(r.success).toBe(true)
+    if (!r.success) return
+
+    const rumpf = JSON.parse(JSON.stringify(r.data)) as Record<string, unknown>
+    expect(Object.keys(rumpf).sort()).toEqual(['description', 'emoji', 'title'])
+    expect(rumpf.emoji).toBeNull()
+    expect(rumpf.description).toBeNull()
   })
 
   it('schneidet Leerraum ab, bevor es prüft', () => {
