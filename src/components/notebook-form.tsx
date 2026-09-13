@@ -9,19 +9,11 @@
 import { useActionState, useId } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { EmojiChoice } from '@/components/ui/emoji-choice'
 import { Field } from '@/components/ui/field'
 import { Notice } from '@/components/ui/notice'
 import type { FormState } from '@/lib/notebooks/actions'
-import { DESCRIPTION_MAX, EMOJI_MAX, TITLE_MAX } from '@/lib/notebooks/schema'
-
-/**
- * `maxLength` zählt UTF-16-Einheiten, `EMOJI_MAX` zählt Code Points. Ein
- * Code Point außerhalb der Basic Multilingual Plane belegt zwei Einheiten, und
- * genau dort liegen die Emoji. Der Faktor gibt dem Browser-Limit denselben
- * Spielraum, den die serverseitige Prüfung in Code Points erlaubt — sonst
- * schnitte das Feld eine Flaggen-Sequenz beim Tippen ab, obwohl sie gültig ist.
- */
-const EMOJI_MAX_UTF16_UNITS = EMOJI_MAX * 2
+import { DESCRIPTION_MAX, TITLE_MAX } from '@/lib/notebooks/schema'
 
 /** Drei Zeilen zeigen eine typische Beschreibung ganz, ohne die Seite zu dehnen. */
 const DESCRIPTION_ROWS = 3
@@ -67,17 +59,9 @@ export function NotebookForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <EmojiChoice defaultValue={defaults?.emoji ?? ''} />
+
       <div className="flex gap-3">
-        <div className="w-24 shrink-0">
-          <Field
-            label="Symbol"
-            name="emoji"
-            defaultValue={defaults?.emoji ?? ''}
-            maxLength={EMOJI_MAX_UTF16_UNITS}
-            placeholder="📊"
-            autoComplete="off"
-          />
-        </div>
         <div className="flex-1">
           <Field
             label={titleLabel}

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { asService, uniqueEmail } from './lib/supabase'
+import { asService, asUser, createUser, uniqueEmail } from './lib/supabase'
 
 /**
  * b1 — Notebooks anlegen, ändern, löschen.
@@ -33,9 +33,16 @@ async function oeffneEinstellungen(page: Page) {
   // 1280px zu Recht unsichtbar, und `waitFor()` darauf lief in eine
   // Zeitüberschreitung — auf genau der Breite, mit der die Tests laufen.
   await page.getByRole('region', { name: 'Quellen' }).waitFor()
-  const zusammenfassung = page.getByText('Einstellungen', { exact: true })
-  await zusammenfassung.click()
-  await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible()
+
+  // Erst nachsehen, dann klicken: `<summary>` **schaltet um**. Ein zweiter
+  // Aufruf in derselben Ansicht klappte den Abschnitt wieder zu, und der Test
+  // scheiterte an einem Knopf, der eben noch da war. Aufgefallen, als ein Test
+  // zweimal in die Einstellungen musste — setzen und wieder entfernen.
+  const speichern = page.getByRole('button', { name: 'Speichern' })
+  if (!(await speichern.isVisible())) {
+    await page.getByText('Einstellungen', { exact: true }).click()
+  }
+  await expect(speichern).toBeVisible()
 }
 
 test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
@@ -49,7 +56,11 @@ test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app\/neu$/)
   await page.getByLabel('Titel').fill('Quartalsanalyse Q3')
-  await page.getByLabel('Symbol').fill('📊')
+  // Das Symbol ist eine Auswahl, kein Textfeld — ein Emoji tippt man nicht.
+  // Die Begründung steht in `ui/emoji-choice.tsx`.
+  const symbol = page.getByRole('radio', { name: '📊' })
+  await symbol.check()
+  await expect(symbol).toBeChecked()
   await page.getByLabel(/Beschreibung/).fill('Umsatz, Marge, Ausblick')
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
 
@@ -124,6 +135,121 @@ test('Löschen verlangt einen zweiten Schritt', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app$/)
   await expect(page.getByText('Noch keine Notebooks')).toBeVisible()
+})
+
+test('ein gesetztes Symbol lässt sich wieder entfernen', async ({ page }) => {
+  // Der gemeldete Fehler, und er betraf zwei Felder: Leere Eingaben wurden zu
+  // `undefined`, und `JSON.stringify({ emoji: undefined })` ergibt `{}`. Die
+  // Spalte stand dann gar nicht im Rumpf, PostgREST ließ sie unverändert — das
+  // Symbol blieb, was es war, ohne Fehlermeldung.
+  //
+  // Beim Anlegen fiel es nicht auf: Dort ist „nichts gesetzt" das Ergebnis,
+  // das man ohnehin bekommt.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Ohne Symbol gestartet')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+
+  // **Auf den genauen Text geprüft, nicht auf die Abwesenheit eines Zeichens.**
+  // `not.toContainText('📈')` bliebe grün, wenn dort ein **anderes** falsches
+  // Symbol stünde — und ein Formular, das beim Leeren irgendein Symbol setzt,
+  // ist genauso kaputt wie eines, das das alte behält.
+  const ueberschrift = page.getByRole('heading', { level: 1 })
+  await expect(ueberschrift).toHaveText('Ohne Symbol gestartet')
+
+  // Setzen — das ging schon vorher.
+  await oeffneEinstellungen(page)
+  await page.getByRole('radio', { name: '📈' }).check()
+  await page.getByRole('button', { name: 'Speichern' }).click()
+  await expect(ueberschrift).toHaveText('📈 Ohne Symbol gestartet')
+
+  // Und wieder weg. Das ist die Zusicherung.
+  await oeffneEinstellungen(page)
+  await page.getByRole('radio', { name: 'Ohne Symbol' }).check()
+  await page.getByRole('button', { name: 'Speichern' }).click()
+  await expect(ueberschrift).toHaveText('Ohne Symbol gestartet')
+
+  // Nach dem Neuladen immer noch weg — sonst hätte nur die Anzeige vergessen,
+  // was in der Datenbank noch steht.
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ohne Symbol gestartet')
+})
+
+test('ein Symbol außerhalb der Auswahl überlebt das Speichern', async ({ page, request }) => {
+  // Vor der Auswahl war das Feld ein Textfeld und nahm jedes Emoji an; solche
+  // Werte stehen in der Datenbank, und die Spalte lässt sie weiter zu.
+  //
+  // Ist keiner der Knöpfe gewählt, schickt der Browser das Feld **gar nicht**,
+  // und aus einem fehlenden Feld wird `null`. Das Symbol wäre verschwunden,
+  // sobald jemand die Einstellungen öffnet und speichert, ohne es anzufassen —
+  // ohne Klick darauf, ohne Fehlermeldung. Gemeldet vom Review, nachgemessen,
+  // und der Grund für den Zweig `eigenes` in `ui/emoji-choice.tsx`.
+  // Über die API angelegt und dann in der Oberfläche angemeldet: Der Test
+  // braucht **beides** — eine Sitzung im Browser für das Formular und ein
+  // Token, um das Symbol so zu setzen, wie es das alte Textfeld erlaubt hätte.
+  // Mit dem Secret Key ginge das nicht: `service_role` darf `notebooks` nur
+  // lesen (Migration 0010), und dafür wird kein Recht ausgeweitet.
+  const nutzer = await createUser(request, 'altsymbol')
+  await page.goto('/anmelden')
+  await page.getByLabel('E-Mail-Adresse').fill(nutzer.email)
+  await page.getByLabel('Passwort').fill(nutzer.password)
+  await page.getByRole('button', { name: 'Anmelden' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Eigenes Symbol')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+  const notebookId = page.url().split('/').pop()!
+
+  // Ein Symbol setzen, das die Auswahl nicht kennt — so, wie es das alte
+  // Textfeld erlaubt hätte.
+  const gesetzt = await asUser(request, nutzer).patch(`notebooks?id=eq.${notebookId}`, {
+    emoji: '🚀'
+  })
+  expect(gesetzt.ok(), await gesetzt.text()).toBe(true)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('🚀 Eigenes Symbol')
+
+  // Jetzt nur den Titel ändern und speichern, das Symbol nicht anfassen.
+  await oeffneEinstellungen(page)
+  await page.getByLabel('Notebook-Titel').fill('Eigenes Symbol, umbenannt')
+  await page.getByRole('button', { name: 'Speichern' }).click()
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('🚀 Eigenes Symbol, umbenannt')
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('🚀 Eigenes Symbol, umbenannt')
+})
+
+test('eine gesetzte Beschreibung lässt sich wieder leeren', async ({ page }) => {
+  // Dasselbe Feld-Verhalten, andere Spalte. Ohne diesen Test wäre die Hälfte
+  // des Fehlers ungeprüft geblieben — gemeldet wurde nur das Symbol.
+  await registerAndSignIn(page)
+  await page.goto('/app/neu')
+  await page.getByLabel('Titel').fill('Mit Beschreibung')
+  await page.getByLabel(/Beschreibung/).fill('Vorläufiger Text')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/)
+
+  const ueberschrift = page.getByRole('heading', { level: 1 })
+  await expect(ueberschrift).toHaveAccessibleDescription('Vorläufiger Text')
+
+  await oeffneEinstellungen(page)
+  await page.getByLabel(/Beschreibung/).fill('')
+  await page.getByRole('button', { name: 'Speichern' }).click()
+
+  // Auf **leer** geprüft, nicht auf „nicht mehr der alte Text": Letzteres
+  // bliebe grün, wenn dort irgendeine andere Beschreibung stünde.
+  //
+  // Und erst auf die neu gerenderte Seite warten, dann neu laden — andersherum
+  // lädt der Test, während die Server Action noch läuft, und liest den alten
+  // Stand. Grün oder rot wäre dann Zufall.
+  await expect(ueberschrift).toHaveAccessibleDescription('')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('')
 })
 
 test('mit dem Notebook verschwinden auch seine Dateien', async ({ page, playwright }) => {

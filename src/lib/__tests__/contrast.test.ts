@@ -146,6 +146,16 @@ const PAIRS: Array<{ where: string; foreground: string; background: string; thre
     threshold: AA_NORMAL
   },
 
+  // Ausgewählte Flächen. `brand-50` ist die Tönung, die eine getroffene Wahl
+  // markiert — beim Symbol eines Notebooks und beim Anbieter-Umschalter.
+  // Hilfstext darauf ist klein und muss deshalb die strenge Schwelle halten.
+  {
+    where: 'Hilfstext auf ausgewählter Fläche',
+    foreground: '--muted-ink',
+    background: '--brand-50',
+    threshold: AA_NORMAL
+  },
+
   // Zitat-Chip: der wichtigste Baustein des Produkts.
   { where: 'Zitat-Chip', foreground: '--cite-fg', background: '--cite-bg', threshold: AA_NORMAL },
 

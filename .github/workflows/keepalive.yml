@@ -37,9 +37,21 @@ jobs:
           URL: ${{ secrets.SUPABASE_URL }}
           KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
+          # **Fehlschlagen, nicht überspringen.**
+          #
+          # Vorher stand hier `exit 0` mit einer Warnung. Der Lauf meldete
+          # damit grün, ohne je einen Request geschickt zu haben — und genau so
+          # ist es passiert: Am 11.09. lief er „erfolgreich" durch, während
+          # `gh api .../actions/secrets` null Einträge zurückgab. Das zweite
+          # Netz existierte nicht, und nichts wies darauf hin.
+          #
+          # Ein Keepalive, der schweigend nichts tut, ist schlimmer als keiner:
+          # Man verlässt sich darauf.
           if [ -z "$URL" ] || [ -z "$KEY" ]; then
-            echo "::warning::SUPABASE_URL oder SUPABASE_PUBLISHABLE_KEY fehlt — übersprungen."
-            exit 0
+            echo "::error::SUPABASE_URL oder SUPABASE_PUBLISHABLE_KEY fehlt."
+            echo "Beide sind öffentliche Werte — der Publishable Key gibt keine Rechte, RLS entscheidet."
+            echo "Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
           fi
           # heartbeat ist eine winzige Tabelle, die nur zu diesem Zweck existiert.
           # Beide Zeitgrenzen sind nötig: --connect-timeout deckt den Fall ab,

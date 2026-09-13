@@ -100,7 +100,7 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
     // Die Unterscheidung steht in `messages.ts`, mitsamt der Abwägung: Eine
     // bereits vergebene Adresse bekommt **dieselbe** Antwort wie eine neue,
     // alles andere wird benannt.
-    const ausgang = signUpOutcome(error.code, error.message, parsed.data.email)
+    const ausgang = signUpOutcome(error.code, error.message)
     return ausgang.ok ? { success: ausgang.message } : { error: ausgang.message }
   }
 

@@ -82,20 +82,22 @@ describe('signUp · was der Nutzer zurückbekommt', () => {
     expect(zustand.error).toBeUndefined()
   })
 
-  it('eine vergebene Adresse sieht aus wie eine neue', async () => {
-    // Die Zusicherung gegen den Abfragedienst. Hier im Zusammenspiel geprüft
-    // und nicht nur in `messages.ts`: Der Fehlerzweig der Action könnte den
-    // Unterschied wieder einführen, indem er `ok` ignoriert.
+  it('eine vergebene Adresse verspricht keine Mail', async () => {
+    // Der Fehler, den die abgeschaltete Bestätigung erzeugt hat: Dieser Zweig
+    // gab „Wir haben eine Bestätigung geschickt" zurück — dieselbe Antwort wie
+    // bei Erfolg, und damit die stärkste Verschwiegenheit. Ohne Mailversand
+    // ist derselbe Satz eine Lüge, und der Nutzer wartet auf etwas, das nicht
+    // kommt.
     signUp.mockResolvedValue({
       data: { user: null, session: null },
       error: { code: 'user_already_exists', message: 'User already registered' }
     })
-    const vergeben = await signUpAction({}, formular('bekannt@beispiel.test'))
 
-    signUp.mockResolvedValue({ data: { user: { id: 'u' }, session: null }, error: null })
-    const neu = await signUpAction({}, formular('bekannt@beispiel.test'))
+    const zustand = await signUpAction({}, formular('bekannt@beispiel.test'))
 
-    expect(vergeben).toEqual(neu)
+    expect(zustand.success).toBeUndefined()
+    expect(zustand.error).toMatch(/melde dich an/i)
+    expect(zustand.error).not.toMatch(/Bestätigung/i)
   })
 
   it('das erschöpfte Kontingent wird als Fehler benannt', async () => {

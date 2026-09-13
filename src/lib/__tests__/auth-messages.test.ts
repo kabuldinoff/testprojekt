@@ -13,28 +13,38 @@ import { bestaetigungAngefordert, signUpOutcome } from '../auth/messages'
 const MAIL = 'person@beispiel.test'
 
 describe('signUpOutcome · Verschwiegenheit', () => {
-  it('eine vergebene Adresse ist von einer neuen nicht zu unterscheiden', () => {
-    const neu = { message: bestaetigungAngefordert(MAIL), ok: true }
-
+  it('eine vergebene Adresse wird nicht als solche benannt', () => {
+    // Die stärkere Fassung — dieselbe Antwort wie bei Erfolg — ging verloren,
+    // als die Bestätigungsmail abgeschaltet wurde: Eine gelungene Registrierung
+    // meldet seitdem sofort an, eine vergebene Adresse kann das nicht, und
+    // damit sind die Ausgänge von außen zwangsläufig verschieden. „Bestätigung
+    // geschickt" anzuzeigen hieße nicht zu schweigen, sondern zu lügen.
+    //
+    // Geblieben ist: Die Meldung **behauptet nicht**, dass es das Konto gibt.
     for (const code of ['user_already_exists', 'email_exists']) {
-      expect(signUpOutcome(code, undefined, MAIL), `Code ${code}`).toEqual(neu)
+      const { message, ok } = signUpOutcome(code, undefined)
+      expect(ok, `Code ${code}`).toBe(false)
+      expect(message, `Code ${code}`).toMatch(/melde dich an/i)
     }
   })
 
   it('auch wenn nur die Rohmeldung es verrät', () => {
     // GoTrue liefert nicht in jeder Version einen Code. Ohne diese Rückfallebene
-    // fiele der Fall in den allgemeinen Zweig — und der sagt „nicht möglich",
-    // was den Unterschied wieder sichtbar machte.
-    expect(signUpOutcome(undefined, 'User already registered', MAIL)).toEqual({
-      message: bestaetigungAngefordert(MAIL),
-      ok: true
-    })
+    // fiele der Fall in den allgemeinen Zweig — und der nennt den Ausweg nicht.
+    expect(signUpOutcome(undefined, 'User already registered').message).toMatch(/melde dich an/i)
+  })
+
+  it('nennt die Adresse nicht noch einmal zurück', () => {
+    // Ein Formular, das die eingegebene Adresse neben „kein Konto möglich"
+    // wiederholt, liest sich wie eine Bestätigung — auch wenn der Satz das
+    // Gegenteil sagt.
+    expect(signUpOutcome('user_already_exists', undefined).message).not.toContain(MAIL)
   })
 
   it('keine Meldung nennt das Wort „vergeben", „existiert" oder „registriert"', () => {
     const verraeterisch = /vergeben|existiert|bereits|registriert/i
     for (const code of ['user_already_exists', 'email_exists', 'over_email_send_rate_limit', 'x']) {
-      expect(signUpOutcome(code, undefined, MAIL).message, code).not.toMatch(verraeterisch)
+      expect(signUpOutcome(code, undefined).message, code).not.toMatch(verraeterisch)
     }
   })
 })
@@ -43,24 +53,22 @@ describe('signUpOutcome · Ehrlichkeit', () => {
   it('das erschöpfte E-Mail-Kontingent wird benannt', () => {
     // Der Fall, der diese Datei ausgelöst hat: Die Grenze liegt projektweit bei
     // zwei Nachrichten pro Stunde und trifft auch eine völlig neue Adresse.
-    const { message, ok } = signUpOutcome('over_email_send_rate_limit', undefined, MAIL)
+    const { message, ok } = signUpOutcome('over_email_send_rate_limit', undefined)
     expect(ok).toBe(false)
     expect(message).toMatch(/Kontingent/)
     expect(message).toMatch(/später/)
   })
 
   it('erkennt das Kontingent auch an der Rohmeldung', () => {
-    expect(signUpOutcome(undefined, 'email rate limit exceeded', MAIL).message).toMatch(
-      /Kontingent/
-    )
+    expect(signUpOutcome(undefined, 'email rate limit exceeded').message).toMatch(/Kontingent/)
   })
 
   it('ein schwaches Passwort sagt, was zu tun ist', () => {
-    expect(signUpOutcome('weak_password', undefined, MAIL).message).toMatch(/längeres/)
+    expect(signUpOutcome('weak_password', undefined).message).toMatch(/längeres/)
   })
 
   it('alles Unbekannte bleibt allgemein', () => {
-    const { message, ok } = signUpOutcome('etwas_ganz_neues', 'boom', MAIL)
+    const { message, ok } = signUpOutcome('etwas_ganz_neues', 'boom')
     expect(ok).toBe(false)
     expect(message).toBe('Registrierung nicht möglich. Bitte später erneut versuchen.')
   })
@@ -69,7 +77,7 @@ describe('signUpOutcome · Ehrlichkeit', () => {
     // Sie ist englisch, technisch und kann sich zwischen zwei GoTrue-Versionen
     // ändern. Ein Nutzer soll nie „over_email_send_rate_limit" lesen.
     const roh = 'For security purposes, you can only request this after 59 seconds.'
-    expect(signUpOutcome('over_email_send_rate_limit', roh, MAIL).message).not.toContain(roh)
+    expect(signUpOutcome('over_email_send_rate_limit', roh).message).not.toContain(roh)
   })
 })
 

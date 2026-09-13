@@ -227,6 +227,22 @@ Policies hat und nicht bloß „RLS an".
 - **Keine Audit-Logs.** Für ein Produkt mit einem Nutzer pro Notebook gäbe es nichts zu
   rekonstruieren, was nicht ohnehin in den Zeilen steht.
 
+- **E-Mail-Adressen sind nicht verifiziert.** In dieser Installation ist die
+  Bestätigungsmail abgeschaltet — wer sich registriert, ist sofort angemeldet, auch mit einer
+  erfundenen Adresse. Nachgemessen mit einer `.invalid`-Adresse.
+
+  Das ist eine Abwägung und keine Nachlässigkeit: Der eingebaute Mailer stellt **nur an
+  Mitglieder des Supabase-Projekts zu**, und eigenes SMTP verlangt eine verifizierte Domain, die
+  es hier nicht gibt (`docs/deployment.md` führt beides aus). Die Alternative wäre ein Produkt,
+  das sich niemand ansehen kann.
+
+  Was dadurch offen ist: Ein Konto lässt sich nicht wiederherstellen — ohne zustellbare Adresse
+  gibt es kein „Passwort vergessen". Und die Drosselung zählt pro Konto; wer beliebig viele
+  anlegt, umgeht sie. Beides ist für eine Demo tragbar und für ein Produkt nicht. Der Code kann
+  den anderen Weg bereits: `signUp` setzt `emailRedirectTo`, der Callback löst den Code ein, und
+  `src/lib/__tests__/auth-signup-redirect.test.ts` hält es fest. Es fehlt allein der
+  Mail-Versand.
+
 - **Keine Content-Security-Policy.** Die größte bewusste Lücke, und die einzige, die in einem
   echten Projekt als Erstes zu schließen wäre.
 

@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Notice } from '@/components/ui/notice'
+import { FileField } from '@/components/ui/file-field'
 import {
   MAX_FILE_BYTES,
   MAX_PASTE_CHARS,
@@ -51,6 +52,21 @@ export function AddSource({ notebookId }: { notebookId: string }) {
   const [error, setError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
+  /**
+   * Zählt hoch, wenn ein Upload durch ist, und baut das Dateifeld damit neu auf.
+   *
+   * `fileInput.current.value = ''` allein reichte nicht: Es löscht zwar die
+   * Auswahl im Feld, löst aber **kein** `change`-Ereignis aus. Der angezeigte
+   * Dateiname lebt in `FileField` und blieb deshalb stehen — `router.refresh()`
+   * erhält den Zustand von Client-Komponenten, die sich nicht geändert haben.
+   * Man sah den Namen der eben hochgeladenen Datei und bekam beim nächsten
+   * Absenden „Bitte eine Datei auswählen".
+   *
+   * Ein `key` ist hier ehrlicher als ein Rücksetz-Signal: Nach dem Hochladen
+   * soll das Feld sein wie neu, und genau das sagt ein neuer `key`.
+   */
+  const [uploads, setUploads] = useState(0)
+
   /** Legt die Quelle an und stößt die Verarbeitung an. */
   async function submit(body: Record<string, unknown>, file?: File) {
     setBusy(true)
@@ -94,7 +110,7 @@ export function AddSource({ notebookId }: { notebookId: string }) {
       }
 
       await fetch(`/api/sources/${result.sourceId}/ingest`, { method: 'POST' })
-      if (fileInput.current) fileInput.current.value = ''
+      setUploads((n) => n + 1)
       router.refresh()
     } catch {
       setError('Verbindung fehlgeschlagen. Bitte erneut versuchen.')
@@ -205,11 +221,12 @@ export function AddSource({ notebookId }: { notebookId: string }) {
           aria-labelledby="tab-datei"
           className="mt-4 flex flex-col gap-3"
         >
-          <Field
+          <FileField
+            key={uploads}
             label="PDF, Text oder Markdown"
             name="file"
-            type="file"
-            ref={fileInput}
+            error={error ?? undefined}
+            inputRef={fileInput}
             accept="application/pdf,text/plain,text/markdown,.pdf,.txt,.md"
             hint="Höchstens 10 MB. Gescannte PDFs ohne Textebene können nicht gelesen werden."
           />

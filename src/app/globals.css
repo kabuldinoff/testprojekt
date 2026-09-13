@@ -420,28 +420,6 @@
     border-left: 1px solid var(--hairline);
   }
 
-  /* Das native Dateifeld in einer 264px-Spalte.
-
-     Browser zeichnen es als „Knopf + Dateiname" und lassen beides nicht
-     umbrechen; in der schmalen Quellenspalte wurde daraus
-     „Choose File No fil...osen". `::file-selector-button` erlaubt, den Knopf
-     zu gestalten, und mit `block` unter dem Text bleibt für den Dateinamen
-     die volle Breite. */
-  .workspace-seite input[type='file'] {
-    font-size: 0.8125rem;
-  }
-
-  .workspace-seite input[type='file']::file-selector-button {
-    margin-right: 0.5rem;
-    padding: 0.25rem 0.625rem;
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-control);
-    background-color: var(--surface-2);
-    color: var(--ink);
-    font: inherit;
-    cursor: pointer;
-  }
-
   /* ── Mobil: ein Bereich zur Zeit ──────────────────────────────────────── */
   @media (width < 48rem) {
     .workspace-spalten {
