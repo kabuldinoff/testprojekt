@@ -8,6 +8,15 @@ audio overview.
 
 Built with **Next.js 16, TypeScript and Supabase**.
 
+**Live: <https://testprojekt-ochre.vercel.app>**
+
+Signing up takes an email address and a password and drops you straight into the workspace —
+there is no confirmation mail to wait for, and [`docs/testplan.md`](docs/testplan.md) explains
+why. A prepared demo account exists as well; its credentials travel separately.
+
+[`docs/entstehung.md`](docs/entstehung.md) describes the order this was built in and what got
+overturned along the way. It is the shortest way in.
+
 ## Repository layout
 
 | Path                       | Purpose                                                                                                     |
@@ -21,7 +30,24 @@ Built with **Next.js 16, TypeScript and Supabase**.
 | `supabase/migrations/`     | Hand-written SQL. Every policy and index carries its reason.                                                |
 | `design/`                  | The design canvas. Open `design/canvas.html` in a browser.                                                  |
 | `docs/adr/`                | Why things are the way they are, including what was deliberately left out.                                  |
+| `docs/entstehung.md`       | The order this was built in, and the decisions that were overturned on the way.                             |
 | `docs/deployment.md`       | How code and schema reach production — on deliberately separate paths.                                      |
+
+## Decision records
+
+Each one carries context, the alternatives, and the consequences — including the decisions that
+were deliberately _not_ taken.
+
+| ADR                                                                    | Subject                                                                    |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [0001](docs/adr/0001-dark-als-default-und-token-architektur.md)        | Dark as the default, and semantic tokens instead of `dark:` prefixes       |
+| [0002](docs/adr/0002-toolchain-versionen.md)                           | Why ESLint stays on 9 and TypeScript on 5, with the error that proved it   |
+| [0003](docs/adr/0003-testpyramide.md)                                  | Two test levels, and why there is no third                                 |
+| [0004](docs/adr/0004-rls-statt-autorisierung-in-der-anwendung.md)      | The database is the boundary, not the application                          |
+| [0005](docs/adr/0005-repository-oeffentlich.md)                        | The repository is public, and what follows from that                       |
+| [0006](docs/adr/0006-ai-anbieter-im-test-ersetzen.md)                  | Replacing the AI providers in the end-to-end suite instead of calling them |
+| [0007](docs/adr/0007-audio-als-wav-und-der-skript-pfad.md)             | Audio stays WAV, and the script is stored before it is ever voiced         |
+| [0008](docs/adr/0008-quelltext-aus-abschnitten-statt-aus-der-datei.md) | The source viewer reads the chunks, not the original file                  |
 
 ## Getting started
 
