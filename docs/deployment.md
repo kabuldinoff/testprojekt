@@ -193,3 +193,18 @@ Zwei unabhängige Netze:
 ⚠️ GitHub deaktiviert geplante Workflows in öffentlichen Repositories nach **60 Tagen** ohne
 Repo-Aktivität. Das Repository ist öffentlich (siehe `docs/adr/0005`), die Regel gilt hier also.
 Verschwindet der Lauf still, ist das der Grund — im Actions-Tab wieder einschalten.
+
+### Das zweite Netz braucht zwei Secrets
+
+`pg_cron` in der Datenbank läuft von selbst — nachgeprüft, der `heartbeat`
+trägt Einträge im vorgesehenen Zweitagestakt.
+
+Der GitHub-Workflow dagegen braucht `SUPABASE_URL` und
+`SUPABASE_PUBLISHABLE_KEY` unter _Settings → Secrets and variables → Actions_.
+Beides sind **öffentliche** Werte; der Publishable Key ist für den Browser
+gedacht und steht ohnehin in jedem ausgelieferten Bundle.
+
+Fehlen sie, schlägt der Lauf jetzt **fehl**. Vorher übersprang er den Request
+mit einer Warnung und meldete grün — und genau so ist es zwei Tage lang
+gelaufen, ohne dass jemand es sah. Ein Keepalive, der schweigend nichts tut,
+ist schlimmer als keiner, weil man sich darauf verlässt.

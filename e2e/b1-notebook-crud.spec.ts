@@ -49,7 +49,11 @@ test('der Leerzustand führt zum ersten Notebook', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/app\/neu$/)
   await page.getByLabel('Titel').fill('Quartalsanalyse Q3')
-  await page.getByLabel('Symbol').fill('📊')
+  // Das Symbol ist eine Auswahl, kein Textfeld — ein Emoji tippt man nicht.
+  // Die Begründung steht in `ui/emoji-choice.tsx`.
+  const symbol = page.getByRole('radio', { name: '📊' })
+  await symbol.check()
+  await expect(symbol).toBeChecked()
   await page.getByLabel(/Beschreibung/).fill('Umsatz, Marge, Ausblick')
   await page.getByRole('button', { name: 'Notebook anlegen' }).click()
 

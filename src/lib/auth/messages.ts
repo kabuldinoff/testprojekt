@@ -10,11 +10,28 @@
  *
  * ── Die Abwägung ─────────────────────────────────────────────────────────
  *
- * Eine schon vergebene Adresse darf **nicht** als solche gemeldet werden.
- * Sonst wird das Formular zum Abfragedienst: Wer wissen will, ob jemand hier
- * ein Konto hat, tippt dessen Adresse ein und liest die Antwort ab. Dieselbe
- * Überlegung steht schon bei der Anmeldung, wo „Konto gibt es nicht" und
- * „Passwort falsch" bewusst dieselbe Meldung ergeben.
+ * Eine schon vergebene Adresse wird **nicht als solche benannt**. Sonst wird
+ * das Formular zum Abfragedienst: Wer wissen will, ob jemand hier ein Konto
+ * hat, tippt dessen Adresse ein und liest die Antwort ab. Dieselbe Überlegung
+ * steht schon bei der Anmeldung, wo „Konto gibt es nicht" und „Passwort
+ * falsch" bewusst dieselbe Meldung ergeben.
+ *
+ * ── Was sich geändert hat, als die Bestätigung abgeschaltet wurde ─────────
+ *
+ * Vorher gab dieser Zweig **dieselbe** Antwort wie eine gelungene
+ * Registrierung: „Wir haben eine Bestätigung geschickt." Beide Fälle sahen
+ * damit gleich aus, und das war die stärkste Form von Verschwiegenheit.
+ *
+ * Ohne Bestätigungsmail geht das nicht mehr, und zwar nicht aus Nachlässigkeit:
+ * Eine gelungene Registrierung **meldet jetzt sofort an** und springt in den
+ * Arbeitsbereich. Eine vergebene Adresse kann das nicht — die beiden Ausgänge
+ * sind von außen zwangsläufig verschieden. Wer weiter „Bestätigung geschickt"
+ * anzeigte, würde nicht schweigen, sondern lügen: Es kommt keine Mail, und der
+ * Nutzer wartet auf etwas, das es nicht gibt.
+ *
+ * Geblieben ist deshalb die schwächere, aber ehrliche Form: Die Meldung
+ * **behauptet nicht**, dass es das Konto gibt, und nennt trotzdem den einzigen
+ * Weg, der weiterhilft.
  *
  * Alles andere darf und soll benannt werden. Die vorige Fassung gab für
  * **jeden** Fehler „Registrierung nicht möglich. Bitte später erneut
@@ -61,21 +78,29 @@ const KONTINGENT = new Set(['over_email_send_rate_limit', 'over_request_rate_lim
  * sie wird nur als Rückfallebene für die Erkennung benutzt, **nie** angezeigt:
  * Sie ist englisch, technisch und kann sich zwischen zwei GoTrue-Versionen
  * ändern.
+ *
+ * Nimmt die Adresse **nicht** entgegen, seit keine Meldung sie mehr nennt. Eine
+ * Adresse neben „kein Konto möglich" liest sich wie eine Bestätigung, auch wenn
+ * der Satz das Gegenteil sagt. Genannt wird sie nur im Erfolgsfall, und dafür
+ * gibt es `bestaetigungAngefordert`.
  */
 export function signUpOutcome(
   code: string | undefined,
-  message: string | undefined,
-  email: string
+  message: string | undefined
 ): SignUpOutcome {
   const kennung = (code ?? '').toLowerCase()
   const roh = (message ?? '').toLowerCase()
 
   if (BEREITS_VERGEBEN.has(kennung) || roh.includes('already registered')) {
-    // **Dieselbe Meldung wie bei Erfolg, und das ist Absicht.** Der Unterschied
-    // wäre die Auskunft, die wir nicht geben wollen. Es wird keine E-Mail
-    // verschickt; wer das Konto wirklich besitzt, kommt über „Passwort
-    // vergessen" weiter, und wer es nicht besitzt, erfährt nichts.
-    return { message: bestaetigungAngefordert(email), ok: true }
+    // Nennt weder „vergeben" noch „existiert" — und schickt trotzdem dorthin,
+    // wo es weitergeht. Wer das Konto besitzt, weiß nach diesem Satz, was zu
+    // tun ist; wer es nicht besitzt, hat keine Bestätigung bekommen, sondern
+    // eine Möglichkeit vorgehalten.
+    return {
+      message:
+        'Mit dieser Adresse lässt sich gerade kein Konto anlegen. Hast du schon eines? Dann melde dich an.',
+      ok: false
+    }
   }
 
   if (KONTINGENT.has(kennung) || roh.includes('rate limit')) {

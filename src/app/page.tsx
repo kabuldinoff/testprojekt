@@ -221,9 +221,14 @@ export default function Home() {
             Wo Ihre Daten <span className="font-serif italic text-muted-ink">wirklich</span> liegen
           </h2>
           <p className="mt-3 max-w-[60ch] text-muted-ink">
-            Die Indexierung Ihrer Quellen läuft fest über einen europäischen Anbieter. Für die
-            Antworten können Sie wählen — und Sie sehen dabei, was das jeweils bedeutet. Genau
-            dieser Text steht auch in der Anwendung neben der Auswahl.
+            Die Indexierung Ihrer Quellen läuft fest über einen europäischen Anbieter — der Schritt,
+            bei dem jedes Dokument vollständig durch einen Dienst läuft, verlässt die EU also nicht.
+            Das ist die Voraussetzung dafür, dass sich der Einsatz als Auftragsverarbeitung nach
+            DSGVO überhaupt sinnvoll regeln lässt.
+          </p>
+          <p className="mt-3 max-w-[60ch] text-muted-ink">
+            Für die Antworten können Sie wählen — und Sie sehen dabei, was das jeweils bedeutet.
+            Genau dieser Text steht auch in der Anwendung neben der Auswahl.
           </p>
           <dl className="mt-6 grid gap-4 sm:grid-cols-2">
             {Object.values(PROVIDERS).map((anbieter) => (

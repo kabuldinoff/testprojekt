@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Notice } from '@/components/ui/notice'
+import { FileField } from '@/components/ui/file-field'
 import {
   MAX_FILE_BYTES,
   MAX_PASTE_CHARS,
@@ -205,11 +206,10 @@ export function AddSource({ notebookId }: { notebookId: string }) {
           aria-labelledby="tab-datei"
           className="mt-4 flex flex-col gap-3"
         >
-          <Field
+          <FileField
             label="PDF, Text oder Markdown"
             name="file"
-            type="file"
-            ref={fileInput}
+            inputRef={fileInput}
             accept="application/pdf,text/plain,text/markdown,.pdf,.txt,.md"
             hint="Höchstens 10 MB. Gescannte PDFs ohne Textebene können nicht gelesen werden."
           />
