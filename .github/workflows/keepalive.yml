@@ -49,7 +49,7 @@ jobs:
           # Man verlässt sich darauf.
           if [ -z "$URL" ] || [ -z "$KEY" ]; then
             echo "::error::SUPABASE_URL oder SUPABASE_PUBLISHABLE_KEY fehlt."
-            echo "Beide sind öffentliche Werte (die Publishable Key ist für den Browser gedacht)."
+            echo "Beide sind öffentliche Werte — der Publishable Key gibt keine Rechte, RLS entscheidet."
             echo "Settings → Secrets and variables → Actions → New repository secret."
             exit 1
           fi

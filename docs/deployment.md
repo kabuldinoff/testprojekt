@@ -201,8 +201,15 @@ trägt Einträge im vorgesehenen Zweitagestakt.
 
 Der GitHub-Workflow dagegen braucht `SUPABASE_URL` und
 `SUPABASE_PUBLISHABLE_KEY` unter _Settings → Secrets and variables → Actions_.
-Beides sind **öffentliche** Werte; der Publishable Key ist für den Browser
-gedacht und steht ohnehin in jedem ausgelieferten Bundle.
+Beides sind **öffentliche** Werte. Der Publishable Key ist der frühere Anon
+Key: Er identifiziert das Projekt, gibt aber keine Rechte — was ein Aufrufer
+damit sieht, entscheidet RLS und nichts sonst. Deshalb trägt er das Präfix
+`NEXT_PUBLIC_` und wird von Next in jedes Bundle eingebacken, das den
+Browser-Client lädt.
+
+(In den Bundles der **öffentlichen** Seiten steht er derzeit nicht — die laden
+den Client gar nicht. Das ist eine Folge davon, wie die Seite aufgebaut ist,
+und kein Schutz, auf den man sich verlassen sollte.)
 
 Fehlen sie, schlägt der Lauf jetzt **fehl**. Vorher übersprang er den Request
 mit einer Warnung und meldete grün — und genau so ist es zwei Tage lang
